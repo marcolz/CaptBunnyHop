@@ -90,7 +90,7 @@
     // ─── CONFIG ──────────────────────────────────────────────────────────────
     const C = {
       W: 800, H: 260, GROUND_Y: 215,
-      GRAVITY: 0.55, JUMP_VEL: -13,
+      GRAVITY: 0.55, JUMP_VEL: -13, JUMP_CUTOFF_VEL: -5,
       INIT_SPEED: 5, MAX_SPEED: 14, SPEED_INC: 0.0015,
       BUNNY_W: 32, BUNNY_H: 36,
       OBS_MIN_GAP: 800, OBS_MAX_GAP: 1500,
@@ -292,6 +292,12 @@
         this.squish = 0.7;
         this.squishTimer = 8;
         playJumpSound();
+      }
+
+      releaseJump() {
+        if (!this.onGround && this.vy < C.JUMP_CUTOFF_VEL) {
+          this.vy = C.JUMP_CUTOFF_VEL;
+        }
       }
 
       update() {
@@ -682,13 +688,25 @@
       }
     }
 
+    function handleRelease() {
+      if (state === 'playing') bunny.releaseJump();
+    }
+
     document.addEventListener('keydown', e => {
       if (e.code === 'Space' || e.code === 'ArrowUp') {
         e.preventDefault();
+        if (e.repeat) return;
         handleInput();
       } else if (e.code === 'Escape') {
         e.preventDefault();
         goToWelcome();
+      }
+    });
+
+    document.addEventListener('keyup', e => {
+      if (e.code === 'Space' || e.code === 'ArrowUp') {
+        e.preventDefault();
+        handleRelease();
       }
     });
 
@@ -697,7 +715,13 @@
       handleInput();
     }, { passive: false });
 
+    document.addEventListener('touchend', e => {
+      e.preventDefault();
+      handleRelease();
+    }, { passive: false });
+
     canvas.addEventListener('mousedown', () => handleInput());
+    canvas.addEventListener('mouseup', () => handleRelease());
 
     // ─── GAME LOOP ────────────────────────────────────────────────────────────
     let lastTs = 0;
