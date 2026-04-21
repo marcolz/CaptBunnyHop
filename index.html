@@ -96,6 +96,19 @@
       OBS_MIN_GAP: 800, OBS_MAX_GAP: 1500,
     };
 
+    const STARTUP_QUOTES = [
+      "A brave little bunny can have a very big adventure.",
+      "Some of the best journeys begin with tiny paws and a curious nose.",
+      "Bunnies teach us that gentle can also be strong.",
+      "Hop by hop, even a small rabbit can cross a great field.",
+      "A rabbit's heart is full of wonder, even when the world feels big.",
+      "Soft ears, quick feet, and a little courage can go a long way.",
+      "Every bunny has a bit of magic in the way they keep going.",
+      "The best kind of hopping is the kind that leads you somewhere new.",
+      "A kind bunny makes every meadow feel more like home.",
+      "Even the smallest rabbit can brighten a very cloudy day."
+    ];
+
     // ─── CANVAS SETUP ────────────────────────────────────────────────────────
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
@@ -702,13 +715,17 @@
     const overlaySub = document.getElementById('overlay-subtitle');
     const overlayScores = document.getElementById('overlay-scores');
 
+    function getRandomQuote() {
+      return STARTUP_QUOTES[Math.floor(Math.random() * STARTUP_QUOTES.length)];
+    }
+
     function showOverlay(mode) {
       overlay.style.display = 'flex';
       startJingle();
       if (mode === 'waiting') {
         overlayTitle.textContent = 'CAPTAIN BUN HOP';
-        overlaySub.textContent = 'Press Space or Tap to Start';
-        overlayScores.textContent = score.high > 0 ? `Best: ${score.high}` : '';
+        overlaySub.textContent = getRandomQuote();
+        overlayScores.textContent = (score.high > 0 ? `Best: ${score.high} • ` : '') + 'Press Space or Tap to Start';
       } else {
         overlayTitle.textContent = 'GAME OVER';
         overlaySub.textContent = `Score: ${score.current}`;
