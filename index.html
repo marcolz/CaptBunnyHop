@@ -110,6 +110,7 @@
 
     // ─── STATE ───────────────────────────────────────────────────────────────
     let state = 'waiting'; // waiting | playing | game_over
+    let gameOverTime = 0;
     let speed = C.INIT_SPEED;
     let frameCount = 0;
 
@@ -655,6 +656,7 @@
 
     function gameOver() {
       state = 'game_over';
+      gameOverTime = performance.now();
       score.checkHigh();
       playHitSound();
       showOverlay('game_over');
@@ -673,7 +675,7 @@
     // ─── INPUT ───────────────────────────────────────────────────────────────
     function handleInput() {
       initAudio();
-      if (state === 'waiting' || state === 'game_over') {
+      if (state === 'waiting' || (state === 'game_over' && performance.now() - gameOverTime >= 3000)) {
         startGame();
       } else if (state === 'playing') {
         bunny.jump();
