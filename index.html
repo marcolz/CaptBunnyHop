@@ -465,7 +465,7 @@
           this.h = this.isMultiStory ? 85 : 58;
           this.x = C.W + 10;
           this.y = C.GROUND_Y - this.h;
-          this.garageH = this.isMultiStory ? 24 : 0;
+          this.garageH = this.isMultiStory ? 40 : 0;
         } else {
           // aspect ratio of booty.png is ~1340:793 ≈ 1.69:1
           this.w = 90; this.h = 53;
@@ -645,7 +645,8 @@
         for (const o of this.list) {
           let ob = o.getBounds();
           if (o.type === 'house' && o.isMultiStory && bunny && bunny.isSquat) {
-            ob = { x: o.x, y: o.y + o.h - o.garageH, w: o.w, h: o.garageH };
+            const m = 4;
+            ob = { x: o.x + m, y: o.y + m, w: o.w - m * 2, h: o.h - o.garageH - m };
           }
           if (b.x < ob.x + ob.w && b.x + b.w > ob.x &&
               b.y < ob.y + ob.h && b.y + b.h > ob.y) return true;
