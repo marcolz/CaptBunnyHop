@@ -129,9 +129,14 @@
 
     // ─── SOUND ───────────────────────────────────────────────────────────────
     let audioCtx = null;
+    let audioUnlocked = false;
 
     function initAudio() {
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (!audioUnlocked) {
+        audioUnlocked = true;
+        startJingle();
+      }
     }
 
     function playJumpSound() {
