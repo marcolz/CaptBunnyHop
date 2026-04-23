@@ -42,3 +42,19 @@ export const score = {
     c.textAlign = 'left';
   },
 };
+
+export interface ScoreEntry { name: string; score: number; }
+
+const HISTORY_KEY = 'bun_history';
+
+export function getHistory(): ScoreEntry[] {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '[]'); }
+  catch { return []; }
+}
+
+export function saveToHistory(name: string, current: number): void {
+  const h = getHistory();
+  h.push({ name: name || 'Bunny', score: current });
+  h.sort((a, b) => b.score - a.score);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, 10)));
+}

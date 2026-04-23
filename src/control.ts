@@ -1,6 +1,6 @@
 import { C } from './config';
 import { game } from './state';
-import { score } from './score';
+import { score, saveToHistory } from './score';
 import { bunny } from './bunny';
 import { obstacles } from './obstacle';
 import { showOverlay, hideOverlay, bunnyNameInput } from './overlay';
@@ -25,6 +25,7 @@ export function gameOver(): void {
   game.status = 'game_over';
   game.gameOverTime = performance.now();
   score.checkHigh();
+  saveToHistory(game.bunnyName, score.current);
   playHitSound();
   showOverlay('game_over');
 }
