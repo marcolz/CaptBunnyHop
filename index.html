@@ -66,6 +66,19 @@
       margin-bottom: 4px;
     }
 
+    #overlay-leaderboard {
+      margin: 8px 0 2px;
+      font: 11px "Courier New", monospace;
+      color: #444;
+      min-width: 200px;
+    }
+    #overlay-leaderboard table { width: 100%; border-collapse: collapse; }
+    #overlay-leaderboard td { padding: 1px 4px; }
+    #overlay-leaderboard .lb-rank { color: #aaa; width: 22px; }
+    #overlay-leaderboard .lb-name { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #overlay-leaderboard .lb-score { text-align: right; font-weight: bold; padding-left: 12px; }
+    #overlay-leaderboard tr.lb-current td { color: #c8813a; }
+
     #overlay-scores {
       font-size: 13px;
       color: #333;
@@ -117,6 +130,7 @@
           <label for="bunny-name">Name your bunny:</label>
           <input id="bunny-name" type="text" maxlength="16" autocomplete="off">
         </div>
+        <div id="overlay-leaderboard"></div>
         <div id="overlay-scores"></div>
       </div>
     </div>
