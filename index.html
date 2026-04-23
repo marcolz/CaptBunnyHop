@@ -264,9 +264,9 @@
       dotX: [50, 150, 250, 350, 450, 550, 650, 750],
       offset1: 0, offset2: 0,
 
-      update(spd) {
-        this.offset1 = (this.offset1 + spd * 0.25) % C.W;
-        this.offset2 = (this.offset2 + spd * 0.55) % C.W;
+      update(spd, tScale) {
+        this.offset1 = (this.offset1 + spd * 0.25 * tScale) % C.W;
+        this.offset2 = (this.offset2 + spd * 0.55 * tScale) % C.W;
       },
 
       draw(c) {
@@ -358,10 +358,10 @@
         this.isSquat = false;
       }
 
-      update() {
+      update(tScale) {
         if (!this.onGround) {
-          this.vy += C.GRAVITY;
-          this.y += this.vy;
+          this.vy += C.GRAVITY * tScale;
+          this.y += this.vy * tScale;
           if (this.y >= C.GROUND_Y - C.BUNNY_H) {
             this.y = C.GROUND_Y - C.BUNNY_H;
             this.vy = 0;
@@ -371,13 +371,14 @@
           }
         }
         if (this.squishTimer > 0) {
-          this.squishTimer--;
-          this.squish += (1 - this.squish) * 0.35;
+          this.squishTimer -= tScale;
+          const ease = 1 - Math.pow(1 - 0.35, tScale);
+          this.squish += (1 - this.squish) * ease;
         } else {
           this.squish = 1;
         }
         if (this.onGround && state === 'playing') {
-          this.hopTimer++;
+          this.hopTimer += tScale;
           if (this.hopTimer >= 8) { this.hopTimer = 0; this.hopFrame = (this.hopFrame + 1) % 4; }
         }
       }
@@ -523,7 +524,7 @@
         }
       }
 
-      update(spd) { this.x -= spd; }
+      update(spd, tScale) { this.x -= spd * tScale; }
 
       isOffscreen() { return this.x + this.w < 0; }
 
@@ -678,15 +679,15 @@
         this.distToNext = 900 + Math.random() * 400;
       },
 
-      update(spd) {
-        this.distToNext -= spd;
+      update(spd, tScale) {
+        this.distToNext -= spd * tScale;
         if (this.distToNext <= 0) {
           const type = Math.random() < 0.55 ? 'house' : 'snack';
           this.list.push(new Obstacle(type, spd));
           const gap = C.OBS_MIN_GAP + Math.random() * (C.OBS_MAX_GAP - C.OBS_MIN_GAP);
           this.distToNext = gap / (spd / C.INIT_SPEED);
         }
-        for (const o of this.list) o.update(spd);
+        for (const o of this.list) o.update(spd, tScale);
         this.list = this.list.filter(o => !o.isOffscreen());
       },
 
@@ -714,11 +715,15 @@
       high: parseInt(localStorage.getItem('dodge_hi') || '0', 10),
       flashTimer: 0,
 
-      reset() { this.current = 0; this.flashTimer = 0; },
+      reset() { this.current = 0; this.flashTimer = 0; this._acc = 0; },
 
-      increment() {
-        this.current++;
-        if (this.current % 100 === 0) this.flashTimer = 20;
+      increment(tScale) {
+        this._acc = (this._acc || 0) + tScale;
+        while (this._acc >= 1) {
+          this._acc -= 1;
+          this.current++;
+          if (this.current % 100 === 0) this.flashTimer = 20;
+        }
       },
 
       checkHigh() {
@@ -898,17 +903,21 @@
       lastTs = ts;
       if (dt > 100) return; // tab was backgrounded
 
+      // Frame-time multiplier: makes physics wall-clock correct regardless of render rate.
+      // Capped so a GC hitch doesn't tunnel the bunny through an obstacle.
+      const tScale = Math.min(dt / (1000 / 60), 3);
+
       if (state === 'playing') {
         frameCount++;
-        speed = Math.min(C.MAX_SPEED, speed + C.SPEED_INC);
-        score.increment();
-        bg.update(speed);
-        bunny.update();
-        obstacles.update(speed);
+        speed = Math.min(C.MAX_SPEED, speed + C.SPEED_INC * tScale);
+        score.increment(tScale);
+        bg.update(speed, tScale);
+        bunny.update(tScale);
+        obstacles.update(speed, tScale);
         if (obstacles.checkCollision(bunny.getBounds(), bunny)) gameOver();
       } else if (state === 'waiting') {
-        bg.update(1.5);
-        bunny.update();
+        bg.update(1.5, tScale);
+        bunny.update(tScale);
       } else if (state === 'game_over') {
         // static — nothing updates
       }
