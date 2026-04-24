@@ -6,6 +6,7 @@ import { startJingle } from './audio';
 export type OverlayMode = 'splash' | 'waiting' | 'game_over';
 
 const overlay = document.getElementById('overlay') as HTMLDivElement;
+const overlayWhatsNew = document.getElementById('overlay-whats-new') as HTMLDivElement;
 const overlayTitle = document.getElementById('overlay-title') as HTMLDivElement;
 const overlaySub = document.getElementById('overlay-subtitle') as HTMLDivElement;
 const overlayScores = document.getElementById('overlay-scores') as HTMLDivElement;
@@ -24,6 +25,7 @@ function escapeHtml(s: string): string {
 export function showOverlay(mode: OverlayMode): void {
   overlay.style.display = 'flex';
   if (mode === 'splash') {
+    overlayWhatsNew.style.display = '';
     overlayTitle.textContent = 'CAPTAIN BUN HOP';
     overlaySub.style.display = '';
     overlaySub.textContent = getRandomQuote();
@@ -32,6 +34,7 @@ export function showOverlay(mode: OverlayMode): void {
     overlayLb.innerHTML = '';
   } else if (mode === 'waiting') {
     startJingle();
+    overlayWhatsNew.style.display = 'none';
     overlayTitle.textContent = 'WELCOME';
     overlaySub.style.display = 'none';
     overlayNameRow.style.display = 'flex';
@@ -40,6 +43,7 @@ export function showOverlay(mode: OverlayMode): void {
     overlayLb.innerHTML = '';
   } else {
     startJingle();
+    overlayWhatsNew.style.display = 'none';
     overlayTitle.textContent = 'GAME OVER';
     overlaySub.style.display = '';
     overlaySub.textContent = game.bunnyName

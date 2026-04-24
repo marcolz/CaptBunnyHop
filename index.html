@@ -39,8 +39,25 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
+      gap: 10px;
       pointer-events: none;
       border-radius: 8px;
+    }
+
+    #overlay-whats-new {
+      background: rgba(255,255,255,0.92);
+      border: 3px solid #c8813a;
+      border-radius: 10px;
+      padding: 8px 16px;
+      font-size: 12px;
+      color: #333;
+      text-align: center;
+      max-width: 80%;
+    }
+    #overlay-whats-new .wn-label {
+      color: #c8813a;
+      font-weight: bold;
+      letter-spacing: 1px;
     }
 
     #overlay-content {
@@ -123,6 +140,9 @@
   <div id="game-wrapper">
     <canvas id="game"></canvas>
     <div id="overlay">
+      <div id="overlay-whats-new">
+        <span class="wn-label">WHAT'S NEW:</span> Pirate Booty Puffs as obstacles!
+      </div>
       <div id="overlay-content">
         <div id="overlay-title">CAPTAIN BUN HOP</div>
         <div id="overlay-subtitle">Press Space or Tap to Start</div>
