@@ -14,6 +14,7 @@ export class Bunny {
   y = C.GROUND_Y - C.BUNNY_H;
   vy = 0;
   onGround = true;
+  jumpsRemaining = C.MAX_JUMPS;
   hopFrame = 0;
   hopTimer = 0;
   squish = 1;
@@ -25,6 +26,7 @@ export class Bunny {
     this.y = C.GROUND_Y - C.BUNNY_H;
     this.vy = 0;
     this.onGround = true;
+    this.jumpsRemaining = C.MAX_JUMPS;
     this.hopFrame = 0;
     this.hopTimer = 0;
     this.squish = 1;
@@ -33,9 +35,10 @@ export class Bunny {
   }
 
   jump(): void {
-    if (!this.onGround) return;
+    if (this.jumpsRemaining <= 0) return;
     this.vy = C.JUMP_VEL;
     this.onGround = false;
+    this.jumpsRemaining--;
     this.squish = 0.7;
     this.squishTimer = 8;
     playJumpSound();
@@ -63,6 +66,7 @@ export class Bunny {
         this.y = C.GROUND_Y - C.BUNNY_H;
         this.vy = 0;
         this.onGround = true;
+        this.jumpsRemaining = C.MAX_JUMPS;
         this.squish = 1.35;
         this.squishTimer = 8;
       }

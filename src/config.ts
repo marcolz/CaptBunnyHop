@@ -5,6 +5,7 @@ export const C = {
   GRAVITY: 0.55,
   JUMP_VEL: -13,
   JUMP_CUTOFF_VEL: -5,
+  MAX_JUMPS: 2,
   INIT_SPEED: 5,
   MAX_SPEED: 14,
   SPEED_INC: 0.0015,
