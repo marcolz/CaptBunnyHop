@@ -1,11 +1,15 @@
 import { C } from './config';
 import { Bunny, Bounds } from './bunny';
 import snackUrl from './assets/snack.webp';
+import puffUrl from './assets/puff.webp';
 
 const snackImg = new Image();
 snackImg.src = snackUrl;
 
-export type ObstacleType = 'house' | 'snack';
+const puffImg = new Image();
+puffImg.src = puffUrl;
+
+export type ObstacleType = 'house' | 'snack' | 'puff';
 
 export class Obstacle {
   type: ObstacleType;
@@ -27,12 +31,18 @@ export class Obstacle {
       this.x = C.W + 10;
       this.y = C.GROUND_Y - this.h;
       this.garageH = this.isMultiStory ? 40 : 0;
-    } else {
+    } else if (type === 'snack') {
       // aspect ratio of snack is ~1340:793 ≈ 1.69:1
       this.w = 90;
       this.h = 53;
       this.x = C.W + 10;
       this.y = C.GROUND_Y - 100 - Math.random() * 30;
+    } else {
+      // puff: big cheesy circle on the ground
+      this.w = 58;
+      this.h = 58;
+      this.x = C.W + 10;
+      this.y = C.GROUND_Y - this.h;
     }
   }
 
@@ -45,6 +55,10 @@ export class Obstacle {
   }
 
   getBounds(): Bounds {
+    if (this.type === 'puff') {
+      const m = 7;
+      return { x: this.x + m, y: this.y + m, w: this.w - m * 2, h: this.h - m * 2 };
+    }
     if (this.type === 'snack') {
       // collision on bag body only, not the wings (outer ~28% each side)
       return {
@@ -60,7 +74,8 @@ export class Obstacle {
 
   draw(c: CanvasRenderingContext2D): void {
     if (this.type === 'house') this._drawHouse(c);
-    else this._drawSnack(c);
+    else if (this.type === 'snack') this._drawSnack(c);
+    else this._drawPuff(c);
   }
 
   _drawHouse(c: CanvasRenderingContext2D): void {
@@ -189,6 +204,17 @@ export class Obstacle {
     }
     c.restore();
   }
+
+  _drawPuff(c: CanvasRenderingContext2D): void {
+    if (puffImg.complete && puffImg.naturalWidth) {
+      c.drawImage(puffImg, this.x, this.y, this.w, this.h);
+    } else {
+      c.fillStyle = '#f0a800';
+      c.beginPath();
+      c.arc(this.x + this.w / 2, this.y + this.h / 2, this.w / 2, 0, Math.PI * 2);
+      c.fill();
+    }
+  }
 }
 
 export const obstacles = {
@@ -203,7 +229,8 @@ export const obstacles = {
   update(spd: number, tScale: number): void {
     this.distToNext -= spd * tScale;
     if (this.distToNext <= 0) {
-      const type: ObstacleType = Math.random() < 0.55 ? 'house' : 'snack';
+      const r = Math.random();
+      const type: ObstacleType = r < 0.42 ? 'house' : r < 0.78 ? 'snack' : 'puff';
       this.list.push(new Obstacle(type, spd));
       const gap = C.OBS_MIN_GAP + Math.random() * (C.OBS_MAX_GAP - C.OBS_MIN_GAP);
       this.distToNext = gap / (spd / C.INIT_SPEED);
