@@ -21,10 +21,29 @@ function handleRelease(): void {
   if (game.status === 'playing') bunny.releaseJump();
 }
 
+const DUCK_ZONE_FRACTION = 2 / 3;
+let duckTouchId: number | null = null;
+
 export function bindInput(canvas: HTMLCanvasElement): void {
   bunnyNameInput.addEventListener('input', () => {
     bunnyNameInput.setCustomValidity('');
   });
+
+  const isInDuckZone = (clientY: number): boolean => {
+    const rect = canvas.getBoundingClientRect();
+    return clientY >= rect.top + rect.height * DUCK_ZONE_FRACTION;
+  };
+
+  const releaseDuckIfMatched = (changedTouches: TouchList): boolean => {
+    for (const t of Array.from(changedTouches)) {
+      if (t.identifier === duckTouchId) {
+        duckTouchId = null;
+        if (game.status === 'playing') bunny.releaseSquat();
+        return true;
+      }
+    }
+    return false;
+  };
 
   document.addEventListener('keydown', e => {
     const inInput = e.target === bunnyNameInput;
@@ -65,12 +84,25 @@ export function bindInput(canvas: HTMLCanvasElement): void {
   document.addEventListener('touchstart', e => {
     if (e.target === bunnyNameInput) return;
     e.preventDefault();
-    handleInput();
+    const touch = e.changedTouches[0];
+    if (game.status === 'playing' && isInDuckZone(touch.clientY)) {
+      duckTouchId = touch.identifier;
+      bunny.squat();
+    } else {
+      handleInput();
+    }
   }, { passive: false });
 
   document.addEventListener('touchend', e => {
     if (e.target === bunnyNameInput) return;
     e.preventDefault();
+    if (releaseDuckIfMatched(e.changedTouches)) return;
+    handleRelease();
+  }, { passive: false });
+
+  document.addEventListener('touchcancel', e => {
+    if (e.target === bunnyNameInput) return;
+    if (releaseDuckIfMatched(e.changedTouches)) return;
     handleRelease();
   }, { passive: false });
 
