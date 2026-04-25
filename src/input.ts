@@ -22,6 +22,10 @@ function handleRelease(): void {
 }
 
 export function bindInput(canvas: HTMLCanvasElement): void {
+  bunnyNameInput.addEventListener('input', () => {
+    bunnyNameInput.setCustomValidity('');
+  });
+
   document.addEventListener('keydown', e => {
     const inInput = e.target === bunnyNameInput;
     if (inInput) {

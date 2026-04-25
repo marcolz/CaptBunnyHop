@@ -6,10 +6,18 @@ import { obstacles } from './obstacle';
 import { showOverlay, hideOverlay, bunnyNameInput } from './overlay';
 import { initAudio, stopJingle, playHitSound } from './audio';
 
-export function startGame(): void {
+export function startGame(): boolean {
+  const enteredName = (bunnyNameInput.value || '').trim().slice(0, 16);
+  if (!enteredName) {
+    bunnyNameInput.setCustomValidity('Please enter a bunny name.');
+    bunnyNameInput.reportValidity();
+    bunnyNameInput.focus();
+    return false;
+  }
+  bunnyNameInput.setCustomValidity('');
   initAudio();
   stopJingle();
-  game.bunnyName = (bunnyNameInput.value || '').trim().slice(0, 16);
+  game.bunnyName = enteredName;
   localStorage.setItem('bunnyName', game.bunnyName);
   if (document.activeElement === bunnyNameInput) bunnyNameInput.blur();
   game.status = 'playing';
@@ -19,6 +27,7 @@ export function startGame(): void {
   bunny.reset();
   obstacles.reset();
   hideOverlay();
+  return true;
 }
 
 export function gameOver(): void {

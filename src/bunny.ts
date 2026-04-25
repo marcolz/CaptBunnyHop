@@ -14,12 +14,16 @@ export class Bunny {
   y = C.GROUND_Y - C.BUNNY_H;
   vy = 0;
   onGround = true;
-  jumpsRemaining = C.MAX_JUMPS;
+  jumpsRemaining: number = C.MAX_JUMPS;
   hopFrame = 0;
   hopTimer = 0;
   squish = 1;
   squishTimer = 0;
   isSquat = false;
+  earFlapTimer = 0;
+  earFlapDuration = 0;
+  earFlapStrength = 0;
+  earSpinAngle = 0;
 
   reset(): void {
     this.x = 110;
@@ -32,15 +36,23 @@ export class Bunny {
     this.squish = 1;
     this.squishTimer = 0;
     this.isSquat = false;
+    this.earFlapTimer = 0;
+    this.earFlapDuration = 0;
+    this.earFlapStrength = 0;
+    this.earSpinAngle = 0;
   }
 
   jump(): void {
     if (this.jumpsRemaining <= 0) return;
+    const isDoubleJump = this.jumpsRemaining === 1;
     this.vy = C.JUMP_VEL;
     this.onGround = false;
     this.jumpsRemaining--;
     this.squish = 0.7;
     this.squishTimer = 8;
+    this.earFlapStrength = isDoubleJump ? 1.15 : 0.7;
+    this.earFlapDuration = isDoubleJump ? 14 : 9;
+    this.earFlapTimer = this.earFlapDuration;
     playJumpSound();
   }
 
@@ -69,7 +81,15 @@ export class Bunny {
         this.jumpsRemaining = C.MAX_JUMPS;
         this.squish = 1.35;
         this.squishTimer = 8;
+        this.earSpinAngle = 0;
       }
+    }
+    if (this.earFlapTimer > 0) {
+      this.earFlapTimer = Math.max(0, this.earFlapTimer - tScale);
+    }
+    if (!this.onGround && this.vy > 1.5) {
+      const spinSpeed = 0.35 + Math.min(this.vy, 14) * 0.1;
+      this.earSpinAngle = (this.earSpinAngle + spinSpeed * tScale) % (Math.PI * 2);
     }
     if (this.squishTimer > 0) {
       this.squishTimer -= tScale;
@@ -132,24 +152,42 @@ export class Bunny {
 
     // Ears
     const earWobble = this.onGround ? Math.sin(hop * Math.PI / 2) * 2 : -3;
-    // Left ear
-    c.fillStyle = '#f5f0e8';
-    c.beginPath();
-    c.ellipse(bx + 10, by + 10 + earWobble, 5, 14, -0.15, 0, Math.PI * 2);
-    c.fill();
-    c.fillStyle = '#f0a0b0';
-    c.beginPath();
-    c.ellipse(bx + 10, by + 11 + earWobble, 2.5, 10, -0.15, 0, Math.PI * 2);
-    c.fill();
-    // Right ear
-    c.fillStyle = '#f5f0e8';
-    c.beginPath();
-    c.ellipse(bx + 22, by + 10 + earWobble, 5, 14, 0.15, 0, Math.PI * 2);
-    c.fill();
-    c.fillStyle = '#f0a0b0';
-    c.beginPath();
-    c.ellipse(bx + 22, by + 11 + earWobble, 2.5, 10, 0.15, 0, Math.PI * 2);
-    c.fill();
+    let earFlap = 0;
+    if (this.earFlapDuration > 0 && this.earFlapTimer > 0) {
+      const p = 1 - this.earFlapTimer / this.earFlapDuration;
+      const downstroke = p < 0.35 ? p / 0.35 : Math.max(0, 1 - (p - 0.35) / 0.65);
+      earFlap = downstroke * this.earFlapStrength;
+    }
+
+    const drawEar = (x: number, y: number, angle: number): void => {
+      c.save();
+      c.translate(x, y);
+      c.rotate(angle);
+      c.fillStyle = '#f5f0e8';
+      c.beginPath();
+      c.ellipse(0, 0, 5, 14, 0, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = '#f0a0b0';
+      c.beginPath();
+      c.ellipse(0, 1, 2.5, 10, 0, 0, Math.PI * 2);
+      c.fill();
+      c.restore();
+    };
+
+    if (!this.onGround && this.vy > 1.5) {
+      const rotor = this.earSpinAngle;
+      const hubX = bx + C.BUNNY_W / 2 + 2;
+      const hubY = by + 10 + earWobble - Math.min(4, this.vy * 0.25);
+      const arm = 8;
+      const xOff = Math.cos(rotor) * arm;
+      const yOff = Math.sin(rotor) * 2.4;
+      drawEar(hubX + xOff, hubY + yOff, rotor);
+      drawEar(hubX - xOff, hubY - yOff, rotor + Math.PI);
+    } else {
+      const earY = by + 10 + earWobble + earFlap * 2.5;
+      drawEar(bx + 10, earY, -0.15 + earFlap * 1.25);
+      drawEar(bx + 22, earY, 0.15 - earFlap * 1.25);
+    }
 
     // Head
     c.fillStyle = '#f5f0e8';
