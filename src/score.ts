@@ -55,6 +55,11 @@ export function getHistory(): ScoreEntry[] {
 export function saveToHistory(name: string, current: number): void {
   const h = getHistory();
   h.push({ name: name || 'Bunny', score: current });
-  h.sort((a, b) => b.score - a.score);
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, 10)));
+  const best = new Map<string, number>();
+  for (const e of h) {
+    if ((best.get(e.name) ?? -1) < e.score) best.set(e.name, e.score);
+  }
+  const deduped = Array.from(best.entries()).map(([n, s]) => ({ name: n, score: s }));
+  deduped.sort((a, b) => b.score - a.score);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(deduped.slice(0, 10)));
 }
