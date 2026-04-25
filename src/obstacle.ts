@@ -25,12 +25,12 @@ export class Obstacle {
     this.type = type;
     this.speed = spawnSpeed;
     if (type === 'house') {
-      this.isMultiStory = Math.random() < 0.35;
+      this.isMultiStory = true;
       this.w = 48;
-      this.h = this.isMultiStory ? 85 : 58;
+      this.h = 85;
       this.x = C.W + 10;
       this.y = C.GROUND_Y - this.h;
-      this.garageH = this.isMultiStory ? 40 : 0;
+      this.garageH = 40;
     } else if (type === 'snack') {
       // aspect ratio of snack is ~1340:793 ≈ 1.69:1
       this.w = 90;
@@ -72,118 +72,170 @@ export class Obstacle {
     return { x: this.x + m, y: this.y + m, w: this.w - m * 2, h: this.h - m * 2 };
   }
 
-  draw(c: CanvasRenderingContext2D): void {
-    if (this.type === 'house') this._drawHouse(c);
+  drawBack(c: CanvasRenderingContext2D): void {
+    if (this.type === 'house') this._drawHouseBack(c);
     else if (this.type === 'snack') this._drawSnack(c);
     else this._drawPuff(c);
   }
 
-  _drawHouse(c: CanvasRenderingContext2D): void {
+  drawFront(c: CanvasRenderingContext2D): void {
+    if (this.type === 'house') this._drawHouseFront(c);
+  }
+
+  _drawHouseBack(c: CanvasRenderingContext2D): void {
     const x = this.x, y = this.y, w = this.w, h = this.h;
+    const front = w - 10;
+    const topH = h - this.garageH;
+    const mid = y + topH;
 
-    if (this.isMultiStory) {
-      // Two-story house with garage
-      const topH = h - this.garageH;
+    // --- Closed top box (everything above the dock opening) ---
+    // Right side shadow panel for top box only
+    c.fillStyle = '#a07030';
+    c.fillRect(x + front, y, 10, topH);
 
-      // Top floor (normal house)
-      c.fillStyle = '#c8813a';
-      c.fillRect(x, y + 20, w, topH - 20);
-      c.fillStyle = '#a86828';
-      c.fillRect(x + w - 10, y + 20, 10, topH - 20);
+    // Body
+    c.fillStyle = '#c8943c';
+    c.fillRect(x, y + 8, front, topH - 8);
 
-      // Roof for top floor
-      c.fillStyle = '#8b4513';
+    // Top lid (lighter)
+    c.fillStyle = '#ddb050';
+    c.fillRect(x, y, front, 8);
+
+    // Amazon-blue Prime tape across the lid (extends across front + side panel)
+    c.fillStyle = '#146eb4';
+    c.fillRect(x, y + 1, front + 10, 5);
+    // Tape bottom shadow
+    c.fillStyle = 'rgba(0,0,0,0.18)';
+    c.fillRect(x, y + 6, front + 10, 1);
+    // Tape top highlight
+    c.fillStyle = 'rgba(255,255,255,0.18)';
+    c.fillRect(x, y + 1, front + 10, 1);
+    // "prime" text on tape
+    c.fillStyle = 'rgba(255,255,255,0.9)';
+    c.font = 'bold 4px monospace';
+    c.fillText('prime', x + 3, y + 5);
+
+    // Lid flap crease (where lid meets body)
+    c.strokeStyle = 'rgba(80,40,10,0.55)';
+    c.lineWidth = 0.8;
+    c.beginPath();
+    c.moveTo(x, y + 8);
+    c.lineTo(x + front, y + 8);
+    c.stroke();
+
+    // "amazon" label
+    c.fillStyle = 'rgba(80,40,10,0.7)';
+    c.font = 'bold 6px monospace';
+    c.fillText('amazon', x + 4, y + 17);
+
+    // Smile arrow (orange)
+    c.strokeStyle = '#ff9900';
+    c.lineWidth = 1.5;
+    const smY = y + 24;
+    const sx1 = x + 5, sx2 = x + front - 6;
+    c.beginPath();
+    c.moveTo(sx1, smY);
+    c.bezierCurveTo(sx1 + 2, smY + 5, sx2 - 2, smY + 5, sx2, smY + 1);
+    c.stroke();
+    c.beginPath();
+    c.moveTo(sx2, smY + 1);
+    c.lineTo(sx2 - 3, smY - 2);
+    c.moveTo(sx2, smY + 1);
+    c.lineTo(sx2 + 1, smY + 4);
+    c.stroke();
+
+    // FRAGILE label
+    c.fillStyle = 'rgba(80,40,10,0.7)';
+    c.font = 'bold 5px monospace';
+    c.fillText('FRAGILE', x + 3, y + 38);
+
+    // Corrugation hint
+    c.strokeStyle = 'rgba(80,40,10,0.18)';
+    c.lineWidth = 0.6;
+    for (let i = 0; i < 2; i++) {
       c.beginPath();
-      c.moveTo(x - 4, y + 22);
-      c.lineTo(x + w / 2, y);
-      c.lineTo(x + w + 4, y + 22);
-      c.closePath();
-      c.fill();
-      c.fillStyle = '#6b3010';
-      c.fillRect(x + w / 2 - 2, y, 4, 22);
-
-      // Window on top floor
-      c.fillStyle = '#a0d4f0';
-      c.fillRect(x + 6, y + 28, 12, 10);
-      c.strokeStyle = '#5a3010';
-      c.lineWidth = 1.5;
-      c.strokeRect(x + 6, y + 28, 12, 10);
-      c.beginPath();
-      c.moveTo(x + 12, y + 28);
-      c.lineTo(x + 12, y + 38);
-      c.moveTo(x + 6, y + 33);
-      c.lineTo(x + 18, y + 33);
+      c.moveTo(x, y + 30 + i * 6);
+      c.lineTo(x + front, y + 30 + i * 6);
       c.stroke();
-
-      // Bottom floor (garage)
-      const gY = y + topH;
-      c.fillStyle = '#8b4513';
-      c.fillRect(x, gY, 6, this.garageH);
-      c.fillRect(x + w - 6, gY, 6, this.garageH);
-      c.fillRect(x, gY, w, 3);
-
-      // Cardboard texture
-      c.strokeStyle = 'rgba(80,40,10,0.3)';
-      c.lineWidth = 0.8;
-      for (let i = 0; i < 2; i++) {
-        c.beginPath();
-        c.moveTo(x + 2, y + 30 + i * 10);
-        c.lineTo(x + w - 6, y + 30 + i * 10);
-        c.stroke();
-      }
-      c.fillStyle = 'rgba(80,40,10,0.35)';
-      c.font = 'bold 5px monospace';
-      c.fillText('2-STORY', x + 2, y + 26);
-    } else {
-      // Single-story house
-      c.fillStyle = '#c8813a';
-      c.fillRect(x, y + 20, w, h - 20);
-      c.fillStyle = '#a86828';
-      c.fillRect(x + w - 10, y + 20, 10, h - 20);
-
-      c.fillStyle = '#8b4513';
-      c.beginPath();
-      c.moveTo(x - 4, y + 22);
-      c.lineTo(x + w / 2, y);
-      c.lineTo(x + w + 4, y + 22);
-      c.closePath();
-      c.fill();
-      c.fillStyle = '#6b3010';
-      c.fillRect(x + w / 2 - 2, y, 4, 22);
-
-      c.fillStyle = '#5a3010';
-      c.fillRect(x + w / 2 - 7, y + h - 22, 14, 22);
-      c.fillStyle = '#3a1a08';
-      c.fillRect(x + w / 2 - 6, y + h - 21, 12, 20);
-      c.fillStyle = '#f0c040';
-      c.beginPath();
-      c.arc(x + w / 2 + 3, y + h - 11, 1.5, 0, Math.PI * 2);
-      c.fill();
-
-      c.fillStyle = '#a0d4f0';
-      c.fillRect(x + 6, y + 28, 12, 10);
-      c.strokeStyle = '#5a3010';
-      c.lineWidth = 1.5;
-      c.strokeRect(x + 6, y + 28, 12, 10);
-      c.beginPath();
-      c.moveTo(x + 12, y + 28);
-      c.lineTo(x + 12, y + 38);
-      c.moveTo(x + 6, y + 33);
-      c.lineTo(x + 18, y + 33);
-      c.stroke();
-
-      c.strokeStyle = 'rgba(80,40,10,0.3)';
-      c.lineWidth = 0.8;
-      for (let i = 0; i < 3; i++) {
-        c.beginPath();
-        c.moveTo(x + 2, y + 30 + i * 10);
-        c.lineTo(x + w - 12, y + 30 + i * 10);
-        c.stroke();
-      }
-      c.fillStyle = 'rgba(80,40,10,0.35)';
-      c.font = 'bold 6px monospace';
-      c.fillText('CARDBOARD', x + 2, y + 26);
     }
+
+    // --- Dock interior back wall (visible through the opening) ---
+    const innerTop = mid + 4;
+    const innerLeft = x + 5;
+    const innerRight = x + front - 5;
+    const innerBottom = y + h;
+
+    // Dark back wall
+    c.fillStyle = '#1a1208';
+    c.fillRect(innerLeft, innerTop, innerRight - innerLeft, innerBottom - innerTop);
+
+    // Top inner shadow gradient (sells the depth of the opening)
+    const grad = c.createLinearGradient(0, innerTop, 0, innerTop + 14);
+    grad.addColorStop(0, 'rgba(0,0,0,0.7)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = grad;
+    c.fillRect(innerLeft, innerTop, innerRight - innerLeft, 14);
+
+    // Subtle vertical corrugation on back wall
+    c.strokeStyle = 'rgba(120,80,40,0.18)';
+    c.lineWidth = 0.5;
+    for (let i = 0; i < 3; i++) {
+      const px = innerLeft + 6 + i * 9;
+      c.beginPath();
+      c.moveTo(px, innerTop + 6);
+      c.lineTo(px, innerBottom - 2);
+      c.stroke();
+    }
+
+    // Floor shadow inside the dock
+    const grad2 = c.createLinearGradient(0, innerBottom - 10, 0, innerBottom);
+    grad2.addColorStop(0, 'rgba(0,0,0,0)');
+    grad2.addColorStop(1, 'rgba(0,0,0,0.55)');
+    c.fillStyle = grad2;
+    c.fillRect(innerLeft, innerBottom - 10, innerRight - innerLeft, 10);
+  }
+
+  _drawHouseFront(c: CanvasRenderingContext2D): void {
+    const x = this.x, y = this.y, w = this.w, h = this.h;
+    const front = w - 10;
+    const topH = h - this.garageH;
+    const mid = y + topH;
+    const headerH = 4;
+    const pillarW = 5;
+    const dockH = h - topH;
+
+    // Top header overhang (front face of cardboard above the opening)
+    c.fillStyle = '#c8943c';
+    c.fillRect(x, mid, front, headerH);
+    // Underside shadow of header (cardboard thickness edge)
+    c.fillStyle = 'rgba(40,20,5,0.7)';
+    c.fillRect(x, mid + headerH - 1, front, 1);
+
+    // Left pillar (front cardboard wall)
+    c.fillStyle = '#c8943c';
+    c.fillRect(x, mid + headerH, pillarW, dockH - headerH);
+    // Inner edge shadow on left pillar
+    c.fillStyle = 'rgba(40,20,5,0.7)';
+    c.fillRect(x + pillarW - 1, mid + headerH, 1, dockH - headerH);
+
+    // Right pillar (front cardboard wall)
+    c.fillStyle = '#c8943c';
+    c.fillRect(x + front - pillarW, mid + headerH, pillarW, dockH - headerH);
+    // Inner edge shadow on right pillar
+    c.fillStyle = 'rgba(40,20,5,0.7)';
+    c.fillRect(x + front - pillarW, mid + headerH, 1, dockH - headerH);
+
+    // Right side shadow panel continuing down through dock area
+    c.fillStyle = '#a07030';
+    c.fillRect(x + front, mid, 10, dockH);
+
+    // Seam line between top box and dock frame
+    c.strokeStyle = 'rgba(80,40,10,0.55)';
+    c.lineWidth = 1;
+    c.beginPath();
+    c.moveTo(x, mid);
+    c.lineTo(x + w, mid);
+    c.stroke();
   }
 
   _drawSnack(c: CanvasRenderingContext2D): void {
@@ -207,7 +259,9 @@ export class Obstacle {
 
   _drawPuff(c: CanvasRenderingContext2D): void {
     if (puffImg.complete && puffImg.naturalWidth) {
-      c.drawImage(puffImg, this.x, this.y, this.w, this.h);
+      const cropBottom = 375; // transparent padding at bottom of source image
+      const sH = puffImg.naturalHeight - cropBottom;
+      c.drawImage(puffImg, 0, 0, puffImg.naturalWidth, sH, this.x, this.y, this.w, this.h);
     } else {
       c.fillStyle = '#f0a800';
       c.beginPath();
@@ -252,7 +306,11 @@ export const obstacles = {
     return false;
   },
 
-  draw(c: CanvasRenderingContext2D): void {
-    for (const o of this.list) o.draw(c);
+  drawBack(c: CanvasRenderingContext2D): void {
+    for (const o of this.list) o.drawBack(c);
+  },
+
+  drawFront(c: CanvasRenderingContext2D): void {
+    for (const o of this.list) o.drawFront(c);
   },
 };

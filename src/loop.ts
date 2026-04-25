@@ -36,8 +36,9 @@ export function startLoop(ctx: CanvasRenderingContext2D): void {
     // Render
     ctx.clearRect(0, 0, C.W, C.H);
     bg.draw(ctx);
-    obstacles.draw(ctx);
+    obstacles.drawBack(ctx);
     bunny.draw(ctx);
+    obstacles.drawFront(ctx);
     score.draw(ctx);
   }
 
