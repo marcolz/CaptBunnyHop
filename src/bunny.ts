@@ -1,6 +1,14 @@
 import { C } from './config';
 import { game } from './state';
 import { playJumpSound } from './audio';
+import { score } from './score';
+import pirateHatUrl from './assets/pirate-hat.webp';
+
+const PIRATE_QUERY = new URLSearchParams(location.search).get('pirate') === '1';
+const PIRATE_SCORE_THRESHOLD = 5000;
+
+const pirateHatImg = new Image();
+pirateHatImg.src = pirateHatUrl;
 
 export interface Bounds {
   x: number;
@@ -194,6 +202,15 @@ export class Bunny {
     c.beginPath();
     c.arc(bx + C.BUNNY_W / 2 + 2, by + 24, 12, 0, Math.PI * 2);
     c.fill();
+
+    const showHat = (PIRATE_QUERY || score.current >= PIRATE_SCORE_THRESHOLD);
+    if (showHat && pirateHatImg.complete) {
+      const hatW = 44;
+      const hatH = 30;
+      const hatCx = bx + C.BUNNY_W / 2 + 2;
+      const hatCy = by - 6;
+      c.drawImage(pirateHatImg, hatCx - hatW / 2, hatCy - hatH / 2, hatW, hatH);
+    }
 
     // Eyes
     c.fillStyle = '#2a1a1a';
