@@ -25,7 +25,7 @@ export class Obstacle {
     this.type = type;
     this.speed = spawnSpeed;
     if (type === 'house') {
-      this.isMultiStory = Math.random() < 0.35;
+      this.isMultiStory = true;
       this.w = 48;
       this.h = this.isMultiStory ? 85 : 58;
       this.x = C.W + 10;
