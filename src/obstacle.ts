@@ -78,62 +78,110 @@ export class Obstacle {
     else this._drawPuff(c);
   }
 
+  drawForeground(c: CanvasRenderingContext2D): void {
+    if (this.type !== 'house' || !this.isMultiStory) return;
+    // Trailing (left) pylon — drawn after the bunny so the bunny passes behind it.
+    const x = this.x;
+    const gY = this.y + (this.h - this.garageH);
+    c.fillStyle = '#c89260';
+    c.fillRect(x, gY, 6, this.garageH);
+    c.fillStyle = '#a8743e';
+    c.fillRect(x + 4, gY, 2, this.garageH);
+  }
+
   _drawHouse(c: CanvasRenderingContext2D): void {
     const x = this.x, y = this.y, w = this.w, h = this.h;
 
     if (this.isMultiStory) {
-      // Two-story house with garage
+      // Stack of two Amazon delivery boxes
       const topH = h - this.garageH;
+      const gY = y + topH;
 
-      // Top floor (normal house)
-      c.fillStyle = '#c8813a';
-      c.fillRect(x, y + 20, w, topH - 20);
-      c.fillStyle = '#a86828';
-      c.fillRect(x + w - 10, y + 20, 10, topH - 20);
+      const cb = '#c89260';
+      const cbDark = '#a8743e';
+      const cbShadow = '#7a5028';
+      const amzBlue = '#1399d1';
+      const amzBlueDeep = '#0c6e9b';
 
-      // Roof for top floor
-      c.fillStyle = '#8b4513';
+      // Top box body
+      c.fillStyle = cb;
+      c.fillRect(x, y, w, topH);
+      c.fillStyle = cbDark;
+      c.fillRect(x + w - 5, y, 5, topH);
+      // Top flap edge
+      c.fillStyle = cbShadow;
+      c.fillRect(x, y, w, 1);
+      // Center flap seam (where the two top flaps meet)
+      c.strokeStyle = 'rgba(80,40,10,0.45)';
+      c.lineWidth = 0.6;
       c.beginPath();
-      c.moveTo(x - 4, y + 22);
-      c.lineTo(x + w / 2, y);
-      c.lineTo(x + w + 4, y + 22);
-      c.closePath();
-      c.fill();
-      c.fillStyle = '#6b3010';
-      c.fillRect(x + w / 2 - 2, y, 4, 22);
-
-      // Window on top floor
-      c.fillStyle = '#a0d4f0';
-      c.fillRect(x + 6, y + 28, 12, 10);
-      c.strokeStyle = '#5a3010';
-      c.lineWidth = 1.5;
-      c.strokeRect(x + 6, y + 28, 12, 10);
-      c.beginPath();
-      c.moveTo(x + 12, y + 28);
-      c.lineTo(x + 12, y + 38);
-      c.moveTo(x + 6, y + 33);
-      c.lineTo(x + 18, y + 33);
+      c.moveTo(x, y + 1);
+      c.lineTo(x + w, y + 1);
       c.stroke();
 
-      // Bottom floor (garage)
-      const gY = y + topH;
-      c.fillStyle = '#8b4513';
-      c.fillRect(x, gY, 6, this.garageH);
+      // Bottom level — open archway so the bunny visibly passes through.
+      // The trailing (left) pylon is drawn in the foreground pass so the
+      // bunny passes behind it; only the leading (right) pylon goes here.
+      c.fillStyle = cb;
       c.fillRect(x + w - 6, gY, 6, this.garageH);
-      c.fillRect(x, gY, w, 3);
+      c.fillStyle = cbDark;
+      c.fillRect(x + w - 5, gY, 5, this.garageH);
+      // Lintel — bottom flaps of the top box overhanging the opening
+      c.fillStyle = cbShadow;
+      c.fillRect(x, gY - 1, w, 2);
+      c.fillStyle = cb;
+      c.fillRect(x, gY + 1, w, 3);
+      c.fillStyle = cbDark;
+      c.fillRect(x + w - 5, gY + 1, 5, 3);
+      // Soft shadow cast under the lintel into the opening
+      c.fillStyle = 'rgba(0,0,0,0.18)';
+      c.fillRect(x + 6, gY + 4, w - 12, 3);
 
-      // Cardboard texture
-      c.strokeStyle = 'rgba(80,40,10,0.3)';
-      c.lineWidth = 0.8;
-      for (let i = 0; i < 2; i++) {
+      // Amazon Prime tape — runs across each box's top flap seam
+      const drawTape = (ty: number) => {
+        c.fillStyle = amzBlue;
+        c.fillRect(x, ty, w, 9);
+        c.fillStyle = 'rgba(255,255,255,0.18)';
+        c.fillRect(x, ty, w, 1);
+        c.fillStyle = amzBlueDeep;
+        c.fillRect(x, ty + 8, w, 1);
+
+        // "amazon" smile arrow centered
+        const cx = x + w / 2;
+        const cy = ty + 4;
+        c.strokeStyle = '#ffffff';
+        c.lineWidth = 1.1;
         c.beginPath();
-        c.moveTo(x + 2, y + 30 + i * 10);
-        c.lineTo(x + w - 6, y + 30 + i * 10);
+        c.arc(cx, cy, 4.2, 0.08 * Math.PI, 0.92 * Math.PI, false);
         c.stroke();
+        // arrow tip on right end of smile
+        c.fillStyle = '#ffffff';
+        c.beginPath();
+        c.moveTo(cx + 4, cy + 2.8);
+        c.lineTo(cx + 6.5, cy + 4.2);
+        c.lineTo(cx + 3.2, cy + 4.6);
+        c.closePath();
+        c.fill();
+        // tiny "prime" wordmark on the left
+        c.fillStyle = '#ffffff';
+        c.font = 'bold 4px sans-serif';
+        c.fillText('prime', x + 2, cy + 2);
+      };
+      drawTape(y + 10);
+
+      // Shipping label on top box
+      const lx = x + w - 16, ly = y + 25;
+      c.fillStyle = '#fff8e0';
+      c.fillRect(lx, ly, 13, 13);
+      c.strokeStyle = cbShadow;
+      c.lineWidth = 0.5;
+      c.strokeRect(lx, ly, 13, 13);
+      c.fillStyle = '#000';
+      c.fillRect(lx + 1, ly + 2, 10, 0.8);
+      c.fillRect(lx + 1, ly + 4, 7, 0.8);
+      for (let i = 0; i < 5; i++) {
+        c.fillRect(lx + 1 + i * 2.2, ly + 7, 1, 5);
       }
-      c.fillStyle = 'rgba(80,40,10,0.35)';
-      c.font = 'bold 5px monospace';
-      c.fillText('2-STORY', x + 2, y + 26);
     } else {
       // Single-story house
       c.fillStyle = '#c8813a';
@@ -254,5 +302,9 @@ export const obstacles = {
 
   draw(c: CanvasRenderingContext2D): void {
     for (const o of this.list) o.draw(c);
+  },
+
+  drawForeground(c: CanvasRenderingContext2D): void {
+    for (const o of this.list) o.drawForeground(c);
   },
 };
