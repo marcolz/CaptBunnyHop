@@ -1,6 +1,6 @@
 import { STARTUP_QUOTES } from './config';
 import { game } from './state';
-import { score, getHistory } from './score';
+import { score, getHistory, ScoreEntry } from './score';
 import { startJingle } from './audio';
 
 export type OverlayMode = 'splash' | 'waiting' | 'game_over';
@@ -52,24 +52,26 @@ export function showOverlay(mode: OverlayMode): void {
     overlayNameRow.style.display = 'none';
     overlayScores.textContent = `Best: ${score.high}${score.current === score.high && score.high > 0 ? ' 🏆 New Record!' : ''}`;
     overlayScores.textContent += '\nPress Space or Tap to Restart';
-    const history = getHistory();
-    overlayLb.innerHTML = '';
-    if (history.length > 0) {
-      const table = document.createElement('table');
-      let highlighted = false;
-      for (let i = 0; i < history.length; i++) {
-        const entry = history[i];
-        const tr = document.createElement('tr');
-        if (!highlighted && entry.score === score.current) {
-          tr.className = 'lb-current';
-          highlighted = true;
-        }
-        tr.innerHTML = `<td class="lb-rank">${i + 1}.</td><td class="lb-name">${escapeHtml(entry.name)}</td><td class="lb-score">${entry.score}</td>`;
-        table.appendChild(tr);
-      }
-      overlayLb.appendChild(table);
-    }
+    renderLeaderboard(getHistory());
   }
+}
+
+export function renderLeaderboard(history: ScoreEntry[]): void {
+  overlayLb.innerHTML = '';
+  if (history.length === 0) return;
+  const table = document.createElement('table');
+  let highlighted = false;
+  for (let i = 0; i < history.length; i++) {
+    const entry = history[i];
+    const tr = document.createElement('tr');
+    if (!highlighted && entry.name === game.bunnyName && entry.score === score.current) {
+      tr.className = 'lb-current';
+      highlighted = true;
+    }
+    tr.innerHTML = `<td class="lb-rank">${i + 1}.</td><td class="lb-name">${escapeHtml(entry.name)}</td><td class="lb-score">${entry.score}</td>`;
+    table.appendChild(tr);
+  }
+  overlayLb.appendChild(table);
 }
 
 export function hideOverlay(): void {

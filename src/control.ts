@@ -3,8 +3,9 @@ import { game } from './state';
 import { score, saveToHistory } from './score';
 import { bunny } from './bunny';
 import { obstacles } from './obstacle';
-import { showOverlay, hideOverlay, bunnyNameInput } from './overlay';
+import { showOverlay, hideOverlay, renderLeaderboard, bunnyNameInput } from './overlay';
 import { initAudio, stopJingle, playHitSound } from './audio';
+import { submitScore } from './leaderboard';
 
 export function startGame(): boolean {
   const enteredName = (bunnyNameInput.value || '').trim().slice(0, 16);
@@ -34,9 +35,12 @@ export function gameOver(): void {
   game.status = 'game_over';
   game.gameOverTime = performance.now();
   score.checkHigh();
-  saveToHistory(game.bunnyName, score.current);
+  const entry = saveToHistory(game.bunnyName, score.current);
   playHitSound();
   showOverlay('game_over');
+  void submitScore(entry).then((merged) => {
+    if (merged && game.status === 'game_over') renderLeaderboard(merged);
+  });
 }
 
 export function goToWelcome(): void {
