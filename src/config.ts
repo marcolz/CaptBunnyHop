@@ -15,6 +15,11 @@ export const C = {
   OBS_MAX_GAP: 1500,
 } as const;
 
+export const JSONBIN = {
+  BIN_ID: '',
+  MASTER_KEY: '',
+} as const;
+
 export const STARTUP_QUOTES = [
   "A brave little bunny can have a very big adventure.",
   "Some of the best journeys begin with tiny paws and a curious nose.",

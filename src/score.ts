@@ -52,14 +52,23 @@ export function getHistory(): ScoreEntry[] {
   catch { return []; }
 }
 
-export function saveToHistory(name: string, current: number): void {
-  const h = getHistory();
-  h.push({ name: name || 'Bunny', score: current });
+export function setHistory(entries: ScoreEntry[]): void {
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(entries));
+}
+
+export function mergeHistory(history: ScoreEntry[], entry: ScoreEntry): ScoreEntry[] {
   const best = new Map<string, number>();
-  for (const e of h) {
+  for (const e of [...history, entry]) {
     if ((best.get(e.name) ?? -1) < e.score) best.set(e.name, e.score);
   }
-  const deduped = Array.from(best.entries()).map(([n, s]) => ({ name: n, score: s }));
-  deduped.sort((a, b) => b.score - a.score);
-  localStorage.setItem(HISTORY_KEY, JSON.stringify(deduped.slice(0, 10)));
+  return Array.from(best.entries())
+    .map(([name, score]) => ({ name, score }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 10);
+}
+
+export function saveToHistory(name: string, current: number): ScoreEntry {
+  const entry: ScoreEntry = { name: name || 'Bunny', score: current };
+  setHistory(mergeHistory(getHistory(), entry));
+  return entry;
 }
