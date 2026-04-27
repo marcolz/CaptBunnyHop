@@ -38,9 +38,9 @@ export class Obstacle {
       this.x = C.W + 10;
       this.y = C.GROUND_Y - 100 - Math.random() * 30;
     } else {
-      // puff: big cheesy circle on the ground
-      this.w = 58;
+      // puff: cheese-puff curl on the ground (image aspect ~1.55:1)
       this.h = 58;
+      this.w = 90;
       this.x = C.W + 10;
       this.y = C.GROUND_Y - this.h;
     }
@@ -56,8 +56,13 @@ export class Obstacle {
 
   getBounds(): Bounds {
     if (this.type === 'puff') {
-      const m = 7;
-      return { x: this.x + m, y: this.y + m, w: this.w - m * 2, h: this.h - m * 2 };
+      // Dense body of the cheese curl, excluding the thin curling tips.
+      return {
+        x: this.x + this.w * 0.21,
+        y: this.y + this.h * 0.13,
+        w: this.w * 0.60,
+        h: this.h * 0.74,
+      };
     }
     if (this.type === 'snack') {
       // collision on bag body only, not the wings (outer ~28% each side)
