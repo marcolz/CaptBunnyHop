@@ -4,7 +4,7 @@ import { score, saveToHistory } from './score';
 import { bunny } from './bunny';
 import { obstacles } from './obstacle';
 import { showOverlay, hideOverlay, bunnyNameInput } from './overlay';
-import { initAudio, stopJingle, playHitSound } from './audio';
+import { initAudio, stopJingle, stopGameOverJingle, playHitSound } from './audio';
 
 export function startGame(): boolean {
   const enteredName = (bunnyNameInput.value || '').trim().slice(0, 16);
@@ -17,6 +17,7 @@ export function startGame(): boolean {
   bunnyNameInput.setCustomValidity('');
   initAudio();
   stopJingle();
+  stopGameOverJingle();
   game.bunnyName = enteredName;
   localStorage.setItem('bunnyName', game.bunnyName);
   if (document.activeElement === bunnyNameInput) bunnyNameInput.blur();
@@ -41,6 +42,7 @@ export function gameOver(): void {
 
 export function goToWelcome(): void {
   stopJingle();
+  stopGameOverJingle();
   game.status = 'waiting';
   game.speed = C.INIT_SPEED;
   score.reset();

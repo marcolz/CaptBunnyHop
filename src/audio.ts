@@ -1,4 +1,5 @@
 import jingleUrl from './assets/jingle.mp3';
+import gameOverUrl from './assets/game-over.mp3';
 
 let audioCtx: AudioContext | null = null;
 
@@ -59,6 +60,31 @@ export function startJingle(): void {
 
 export function stopJingle(): void {
   const audio = getJingle();
+  if (!audio) return;
+  audio.pause();
+  audio.currentTime = 0;
+}
+
+let gameOverEl: HTMLAudioElement | null = null;
+
+function getGameOver(): HTMLAudioElement | null {
+  if (gameOverEl) return gameOverEl;
+  const el = document.getElementById('gameOverAudio');
+  if (!(el instanceof HTMLAudioElement)) return null;
+  if (!el.src) el.src = gameOverUrl;
+  gameOverEl = el;
+  return gameOverEl;
+}
+
+export function playGameOverJingle(): void {
+  const audio = getGameOver();
+  if (!audio) return;
+  audio.currentTime = 0;
+  audio.play().catch(err => console.log('Game-over audio play failed:', err));
+}
+
+export function stopGameOverJingle(): void {
+  const audio = getGameOver();
   if (!audio) return;
   audio.pause();
   audio.currentTime = 0;

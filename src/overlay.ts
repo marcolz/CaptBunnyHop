@@ -1,7 +1,7 @@
 import { STARTUP_QUOTES } from './config';
 import { game } from './state';
 import { score, getHistory } from './score';
-import { startJingle } from './audio';
+import { startJingle, stopJingle, playGameOverJingle } from './audio';
 
 export type OverlayMode = 'splash' | 'waiting' | 'game_over';
 
@@ -42,7 +42,8 @@ export function showOverlay(mode: OverlayMode): void {
     overlayScores.textContent = (score.high > 0 ? `Best: ${score.high} • ` : '') + 'Press Space or Tap to Start';
     overlayLb.innerHTML = '';
   } else {
-    startJingle();
+    stopJingle();
+    playGameOverJingle();
     overlayWhatsNew.style.display = 'none';
     overlayTitle.textContent = 'GAME OVER';
     overlaySub.style.display = '';
