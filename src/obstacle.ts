@@ -20,6 +20,7 @@ export class Obstacle {
   h: number;
   isMultiStory = false;
   garageH = 0;
+  visualScale = 1;
 
   constructor(type: ObstacleType, spawnSpeed: number) {
     this.type = type;
@@ -39,10 +40,12 @@ export class Obstacle {
       this.y = C.GROUND_Y - 100 - Math.random() * 30;
     } else {
       // puff: cheese-puff curl on the ground (image aspect ~1.55:1)
-      this.h = 58;
-      this.w = 90;
+      this.h = 42;
+      this.w = 65;
       this.x = C.W + 10;
       this.y = C.GROUND_Y - this.h;
+      // ~1 in 20 puffs is visually gigantic (collision unaffected).
+      if (Math.random() < 0.05) this.visualScale = 3.2;
     }
   }
 
@@ -259,14 +262,29 @@ export class Obstacle {
   }
 
   _drawPuff(c: CanvasRenderingContext2D): void {
+    const t = Date.now();
+    const phase = (this.x + this.y) * 0.05;
+    const swing = Math.sin(t / 280 + phase) * 0.22;
+    const bob = Math.sin(t / 320 + phase) * 1.2;
+    const s = this.visualScale;
+    const drawW = this.w * s;
+    const drawH = this.h * s;
+    // Anchor by the bottom centre of the original (collision) box so the giant
+    // puff still rests on the ground.
+    const pivotX = this.x + this.w / 2;
+    const pivotY = this.y + this.h - drawH * 0.85;
+    c.save();
+    c.translate(pivotX, pivotY + bob);
+    c.rotate(swing);
     if (puffImg.complete && puffImg.naturalWidth) {
-      c.drawImage(puffImg, this.x, this.y, this.w, this.h);
+      c.drawImage(puffImg, -drawW / 2, -drawH * 0.15, drawW, drawH);
     } else {
       c.fillStyle = '#f0a800';
       c.beginPath();
-      c.arc(this.x + this.w / 2, this.y + this.h / 2, this.w / 2, 0, Math.PI * 2);
+      c.arc(0, drawH * 0.35, drawW / 2, 0, Math.PI * 2);
       c.fill();
     }
+    c.restore();
   }
 }
 
