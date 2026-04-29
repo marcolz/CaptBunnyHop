@@ -10,7 +10,7 @@ function handleInput(): void {
     game.status = 'waiting';
     showOverlay('waiting');
     setTimeout(() => bunnyNameInput.focus(), 0);
-  } else if (game.status === 'waiting' || (game.status === 'game_over' && performance.now() - game.gameOverTime >= 3000)) {
+  } else if (game.status === 'waiting' || (game.status === 'game_over' && performance.now() - game.gameOverTime >= 2000)) {
     startGame();
   } else if (game.status === 'playing') {
     bunny.jump();
