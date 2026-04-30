@@ -15,6 +15,11 @@ export const C = {
   OBS_MAX_GAP: 1500,
 } as const;
 
+export const SPECIES_PHYSICS = {
+  bunny: { jumpVel: -11.5, maxJumps: 2, jumpCutoffVel: -4.5 },
+  kitten: { jumpVel: -13.8, maxJumps: 1, jumpCutoffVel: -5.5 },
+} as const;
+
 export const STARTUP_QUOTES = [
   "A brave little bunny can have a very big adventure.",
   "Some of the best journeys begin with tiny paws and a curious nose.",

@@ -25,6 +25,43 @@ export function playJumpSound(): void {
   osc.stop(audioCtx.currentTime + 0.18);
 }
 
+export function playMeow(): void {
+  if (!audioCtx) return;
+  const ctx = audioCtx;
+  const t0 = ctx.currentTime;
+
+  // Two-syllable "me-ow": rising vowel then falling vowel.
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  // A formant-ish lowpass shapes the buzzy sawtooth into a vowel.
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.Q.value = 8;
+
+  osc.type = 'sawtooth';
+  // Pitch: rise on "me", fall on "ow".
+  osc.frequency.setValueAtTime(640, t0);
+  osc.frequency.linearRampToValueAtTime(860, t0 + 0.10);
+  osc.frequency.linearRampToValueAtTime(690, t0 + 0.22);
+  osc.frequency.linearRampToValueAtTime(450, t0 + 0.45);
+
+  // Formant sweep: "ee" (~2200 Hz) → "aa" (~1100 Hz) → "oo" (~700 Hz).
+  filter.frequency.setValueAtTime(2200, t0);
+  filter.frequency.linearRampToValueAtTime(1100, t0 + 0.18);
+  filter.frequency.linearRampToValueAtTime(700, t0 + 0.45);
+
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.exponentialRampToValueAtTime(0.22, t0 + 0.05);
+  gain.gain.exponentialRampToValueAtTime(0.18, t0 + 0.22);
+  gain.gain.exponentialRampToValueAtTime(0.001, t0 + 0.5);
+
+  osc.connect(filter);
+  filter.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(t0);
+  osc.stop(t0 + 0.55);
+}
+
 export function playHitSound(): void {
   if (!audioCtx) return;
   const osc = audioCtx.createOscillator();

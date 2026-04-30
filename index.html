@@ -134,6 +134,54 @@
       border-color: #a5681f;
       box-shadow: 0 0 0 2px rgba(200,129,58,0.2);
     }
+
+    #overlay-character-row {
+      display: flex;
+      flex-direction: row;
+      gap: 16px;
+      margin: 12px 0 4px;
+      pointer-events: auto;
+      justify-content: center;
+    }
+    .char-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 10px 14px;
+      background: #fff;
+      border: 3px solid #c8813a;
+      border-radius: 10px;
+      cursor: pointer;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      font-weight: bold;
+      color: #555;
+      transition: transform 0.08s, box-shadow 0.08s;
+    }
+    .char-btn:hover { transform: translateY(-2px); }
+    .char-btn.selected {
+      background: #fff4e0;
+      border-color: #a5681f;
+      color: #c8813a;
+      box-shadow: 0 0 0 3px rgba(200,129,58,0.25);
+    }
+    .char-btn canvas {
+      width: 64px;
+      height: 64px;
+      image-rendering: pixelated;
+      box-shadow: none;
+      border-radius: 0;
+    }
+    .char-btn .char-power {
+      font-size: 10px;
+      font-weight: normal;
+      color: #888;
+      letter-spacing: 0.5px;
+    }
+    .char-btn.selected .char-power {
+      color: #a5681f;
+    }
   </style>
 </head>
 <body>
@@ -141,13 +189,25 @@
     <canvas id="game"></canvas>
     <div id="overlay">
       <div id="overlay-whats-new">
-        <span class="wn-label">WHAT'S NEW:</span> Cheese puffs are smaller and now sway &mdash; watch out for the rare GIANT one!
+        <span class="wn-label">WHAT'S NEW:</span> A kitten just hopped into your pet zoo! Pick your buddy &mdash; bunny or kitten &mdash; before you play.
        </div>
       <div id="overlay-content">
         <div id="overlay-title">CAPTAIN BUN HOP</div>
         <div id="overlay-subtitle">Press Space or Tap to Start</div>
+        <div id="overlay-character-row" style="display:none;">
+          <button type="button" class="char-btn" id="char-btn-bunny" data-species="bunny">
+            <canvas width="64" height="64" id="char-preview-bunny"></canvas>
+            <span>Bunny</span>
+            <span class="char-power">Jumps twice</span>
+          </button>
+          <button type="button" class="char-btn" id="char-btn-kitten" data-species="kitten">
+            <canvas width="64" height="64" id="char-preview-kitten"></canvas>
+            <span>Kitten</span>
+            <span class="char-power">Jumps higher</span>
+          </button>
+        </div>
         <div id="overlay-name-row" style="display:none;">
-          <label for="bunny-name">Name your bunny:</label>
+          <label for="bunny-name" id="bunny-name-label">Name your bunny:</label>
           <input id="bunny-name" type="text" maxlength="16" autocomplete="off">
         </div>
         <div id="overlay-leaderboard"></div>

@@ -1,5 +1,5 @@
 import { C } from './config';
-import { game } from './state';
+import { game, setCurrentName } from './state';
 import { score, saveToHistory } from './score';
 import { bunny } from './bunny';
 import { obstacles } from './obstacle';
@@ -9,7 +9,8 @@ import { initAudio, stopJingle, stopGameOverJingle, playHitSound } from './audio
 export function startGame(): boolean {
   const enteredName = (bunnyNameInput.value || '').trim().slice(0, 16);
   if (!enteredName) {
-    bunnyNameInput.setCustomValidity('Please enter a bunny name.');
+    const noun = game.species === 'kitten' ? 'kitten' : 'bunny';
+    bunnyNameInput.setCustomValidity(`Please enter a ${noun} name.`);
     bunnyNameInput.reportValidity();
     bunnyNameInput.focus();
     return false;
@@ -18,8 +19,7 @@ export function startGame(): boolean {
   initAudio();
   stopJingle();
   stopGameOverJingle();
-  game.bunnyName = enteredName;
-  localStorage.setItem('bunnyName', game.bunnyName);
+  setCurrentName(enteredName);
   if (document.activeElement === bunnyNameInput) bunnyNameInput.blur();
   game.status = 'playing';
   game.speed = C.INIT_SPEED;
@@ -35,9 +35,21 @@ export function gameOver(): void {
   game.status = 'game_over';
   game.gameOverTime = performance.now();
   score.checkHigh();
-  saveToHistory(game.bunnyName, score.current);
+  const name = game.species === 'kitten' ? game.kittenName : game.bunnyName;
+  saveToHistory(name, score.current);
   playHitSound();
   showOverlay('game_over');
+}
+
+export function goToCharacterSelect(): void {
+  stopJingle();
+  stopGameOverJingle();
+  game.status = 'character_select';
+  game.speed = C.INIT_SPEED;
+  score.reset();
+  bunny.reset();
+  obstacles.reset();
+  showOverlay('character_select');
 }
 
 export function goToWelcome(): void {
