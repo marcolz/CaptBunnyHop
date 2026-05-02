@@ -32,6 +32,7 @@ export class Bunny {
   earFlapDuration = 0;
   earFlapStrength = 0;
   earSpinAngle = 0;
+  glideHeld = false;
 
   reset(): void {
     this.x = 110;
@@ -48,6 +49,15 @@ export class Bunny {
     this.earFlapDuration = 0;
     this.earFlapStrength = 0;
     this.earSpinAngle = 0;
+    this.glideHeld = false;
+  }
+
+  setGlideHeld(v: boolean): void {
+    this.glideHeld = v;
+  }
+
+  isGliding(): boolean {
+    return game.species === 'puppy' && this.glideHeld && !this.onGround && this.vy > 0;
   }
 
   jump(): void {
@@ -82,7 +92,12 @@ export class Bunny {
 
   update(tScale: number): void {
     if (!this.onGround) {
-      this.vy += C.GRAVITY * tScale;
+      if (this.isGliding()) {
+        this.vy += C.GRAVITY * C.GLIDE_GRAVITY_MULT * tScale;
+        if (this.vy > C.GLIDE_MAX_VY) this.vy = C.GLIDE_MAX_VY;
+      } else {
+        this.vy += C.GRAVITY * tScale;
+      }
       this.y += this.vy * tScale;
       if (this.y >= C.GROUND_Y - C.BUNNY_H) {
         this.y = C.GROUND_Y - C.BUNNY_H;
@@ -124,11 +139,21 @@ export class Bunny {
   }
 
   draw(c: CanvasRenderingContext2D): void {
-    if (game.species === 'kitten') {
-      drawCharacter(c, this, 'kitten', true, true);
-    } else {
-      drawCharacter(c, this, 'bunny', true, true);
-    }
+    const drawState: DrawableState = {
+      x: this.x,
+      y: this.y,
+      vy: this.vy,
+      onGround: this.onGround,
+      isSquat: this.isSquat,
+      squish: this.squish,
+      hopFrame: this.hopFrame,
+      earFlapTimer: this.earFlapTimer,
+      earFlapDuration: this.earFlapDuration,
+      earFlapStrength: this.earFlapStrength,
+      earSpinAngle: this.earSpinAngle,
+      isGliding: this.isGliding(),
+    };
+    drawCharacter(c, drawState, game.species, true, true);
   }
 }
 
@@ -146,12 +171,13 @@ interface DrawableState {
   earFlapDuration: number;
   earFlapStrength: number;
   earSpinAngle: number;
+  isGliding: boolean;
 }
 
 export function drawCharacter(
   c: CanvasRenderingContext2D,
   s: DrawableState,
-  species: 'bunny' | 'kitten',
+  species: 'bunny' | 'kitten' | 'puppy',
   withShadow: boolean,
   withHat: boolean,
 ): void {
@@ -165,6 +191,8 @@ export function drawCharacter(
 
   if (species === 'kitten') {
     drawKittenBody(c, s, withShadow, withHat);
+  } else if (species === 'puppy') {
+    drawPuppyBody(c, s, withShadow, withHat);
   } else {
     drawBunnyBody(c, s, withShadow, withHat);
   }
@@ -542,9 +570,207 @@ function drawKittenBody(
   c.fill();
 }
 
+function drawPuppyBody(
+  c: CanvasRenderingContext2D,
+  s: DrawableState,
+  withShadow: boolean,
+  withHat: boolean,
+): void {
+  const bx = s.x;
+  const by = s.y;
+  const hop = s.hopFrame;
+
+  const FUR = '#e8c878';
+  const FUR_DARK = '#c8a868';
+  const BELLY = '#fff0d8';
+  const EAR = '#b88848';
+  const EAR_INNER = '#e8b8a0';
+
+  if (withShadow) {
+    c.fillStyle = 'rgba(0,0,0,0.12)';
+    c.beginPath();
+    // While gliding the shadow widens slightly to read like an in-air parachute.
+    const shadowW = s.isGliding ? 18 : 14;
+    c.ellipse(bx + C.BUNNY_W / 2, C.GROUND_Y + 2, shadowW, 4, 0, 0, Math.PI * 2);
+    c.fill();
+  }
+
+  // Tail — curved stroke that swishes via hopFrame; small wag on landing.
+  let tailWag = 0;
+  if (s.earFlapDuration > 0 && s.earFlapTimer > 0) {
+    const p = 1 - s.earFlapTimer / s.earFlapDuration;
+    const downstroke = p < 0.35 ? p / 0.35 : Math.max(0, 1 - (p - 0.35) / 0.65);
+    tailWag = downstroke * s.earFlapStrength;
+  }
+  const idleSwish = s.onGround ? Math.sin(hop * Math.PI / 2) * 3 : -2;
+  c.strokeStyle = FUR;
+  c.lineWidth = 4.5;
+  c.lineCap = 'round';
+  const tailBaseX = bx + 4;
+  const tailBaseY = by + C.BUNNY_H - 12;
+  c.beginPath();
+  c.moveTo(tailBaseX, tailBaseY);
+  c.quadraticCurveTo(
+    bx - 6 + tailWag * 4,
+    by + C.BUNNY_H - 18 + idleSwish,
+    bx - 4 + tailWag * 6,
+    by + C.BUNNY_H - 24 + idleSwish - tailWag * 4,
+  );
+  c.stroke();
+  c.lineWidth = 1;
+
+  // Body
+  c.fillStyle = FUR;
+  c.beginPath();
+  c.ellipse(bx + C.BUNNY_W / 2, by + C.BUNNY_H - 14, 14, 16, 0, 0, Math.PI * 2);
+  c.fill();
+
+  // Belly
+  c.fillStyle = BELLY;
+  c.beginPath();
+  c.ellipse(bx + C.BUNNY_W / 2 + 2, by + C.BUNNY_H - 12, 8, 10, 0.1, 0, Math.PI * 2);
+  c.fill();
+
+  // Head (drawn before ears so floppy ears can sit on top of head edge)
+  const headCx = bx + C.BUNNY_W / 2 + 2;
+  const headCy = by + 24;
+  c.fillStyle = FUR;
+  c.beginPath();
+  c.arc(headCx, headCy, 12, 0, Math.PI * 2);
+  c.fill();
+
+  // Floppy ears: long ovals hanging beside the head.
+  // - On ground: hang straight down with a small idle wobble.
+  // - In air falling fast (not gliding): lifted slightly by airflow.
+  // - Gliding: rotate outward, like wings spread, to read as a parachute.
+  const earWobble = s.onGround ? Math.sin(hop * Math.PI / 2) * 1.5 : 0;
+  let earTilt = 0;        // radians outward from straight-down
+  let earLift = 0;        // px shift up at the hinge
+  let earLen = 13;        // base ear length
+  let earWide = 4.5;      // base ear width
+  if (s.isGliding) {
+    earTilt = 1.0;        // ~57° outward
+    earLift = -2;
+    earLen = 15;
+    earWide = 5.5;
+  } else if (!s.onGround && s.vy > 1.5) {
+    earTilt = 0.35;
+    earLift = -1;
+  }
+
+  const drawFloppyEar = (hingeX: number, hingeY: number, dir: number): void => {
+    c.save();
+    c.translate(hingeX, hingeY + earLift);
+    // Rotate so ear hangs down (Math.PI/2 = pointing down on canvas), then add outward tilt.
+    c.rotate(Math.PI / 2 + dir * earTilt + dir * earWobble * 0.05);
+    // Outer ear (slightly darker than fur for floppy depth)
+    c.fillStyle = EAR;
+    c.beginPath();
+    c.ellipse(earLen * 0.55, 0, earLen, earWide, 0, 0, Math.PI * 2);
+    c.fill();
+    // Inner pink (only visible on the inside half)
+    c.fillStyle = EAR_INNER;
+    c.beginPath();
+    c.ellipse(earLen * 0.55, 0, earLen * 0.65, earWide * 0.5, 0, 0, Math.PI * 2);
+    c.fill();
+    c.restore();
+  };
+
+  drawFloppyEar(headCx - 9, headCy - 4, -1);
+  drawFloppyEar(headCx + 9, headCy - 4, 1);
+
+  // Forehead splotch (lab patch)
+  c.fillStyle = FUR_DARK;
+  c.beginPath();
+  c.ellipse(headCx - 3, headCy - 6, 3, 2.2, -0.3, 0, Math.PI * 2);
+  c.fill();
+
+  // Snout (lighter oval at front of head)
+  c.fillStyle = BELLY;
+  c.beginPath();
+  c.ellipse(headCx, headCy + 4, 6, 4, 0, 0, Math.PI * 2);
+  c.fill();
+
+  if (withHat) {
+    const showHat = (PIRATE_QUERY || score.current >= PIRATE_SCORE_THRESHOLD);
+    if (showHat && pirateHatImg.complete) {
+      const hatW = 44;
+      const hatH = 30;
+      const hatCx = bx + C.BUNNY_W / 2 + 2;
+      const hatCy = by - 6;
+      c.drawImage(pirateHatImg, hatCx - hatW / 2, hatCy - hatH / 2, hatW, hatH);
+    }
+  }
+
+  // Eyes — round and friendly
+  c.fillStyle = '#2a1a1a';
+  c.beginPath();
+  c.arc(bx + 12, by + 22, 2.4, 0, Math.PI * 2);
+  c.fill();
+  c.beginPath();
+  c.arc(bx + 22, by + 22, 2.4, 0, Math.PI * 2);
+  c.fill();
+  // shine
+  c.fillStyle = 'white';
+  c.beginPath();
+  c.arc(bx + 13, by + 21, 0.9, 0, Math.PI * 2);
+  c.fill();
+  c.beginPath();
+  c.arc(bx + 23, by + 21, 0.9, 0, Math.PI * 2);
+  c.fill();
+
+  // Nose — black dot at tip of snout
+  c.fillStyle = '#1a1010';
+  c.beginPath();
+  c.ellipse(headCx, headCy + 2.5, 2, 1.5, 0, 0, Math.PI * 2);
+  c.fill();
+
+  // Mouth — small smile under snout
+  c.strokeStyle = '#5a3020';
+  c.lineWidth = 1;
+  c.beginPath();
+  c.moveTo(headCx, headCy + 4);
+  c.lineTo(headCx, headCy + 6);
+  c.stroke();
+  c.beginPath();
+  c.moveTo(headCx, headCy + 6);
+  c.quadraticCurveTo(headCx - 2.5, headCy + 7.5, headCx - 4, headCy + 6.5);
+  c.stroke();
+  c.beginPath();
+  c.moveTo(headCx, headCy + 6);
+  c.quadraticCurveTo(headCx + 2.5, headCy + 7.5, headCx + 4, headCy + 6.5);
+  c.stroke();
+
+  // Tongue (only visible if gliding — happy panting puppy!)
+  if (s.isGliding) {
+    c.fillStyle = '#f08090';
+    c.beginPath();
+    c.ellipse(headCx, headCy + 7.5, 1.6, 1.2, 0, 0, Math.PI * 2);
+    c.fill();
+  }
+
+  // Legs — hop animation
+  const legOffset = s.onGround ? [0, 4, 0, -4][hop] : 0;
+  c.fillStyle = FUR;
+  c.beginPath();
+  c.ellipse(bx + 8, by + C.BUNNY_H - 4 + legOffset, 7, 5, s.onGround ? 0.3 : -0.5, 0, Math.PI * 2);
+  c.fill();
+  c.beginPath();
+  c.ellipse(bx + 22, by + C.BUNNY_H - 4 - legOffset, 6, 4.5, -0.3, 0, Math.PI * 2);
+  c.fill();
+  // Paw tips
+  c.fillStyle = BELLY;
+  c.beginPath();
+  c.ellipse(bx + 9, by + C.BUNNY_H - 2 + legOffset, 2.5, 1.2, 0, 0, Math.PI * 2);
+  c.fill();
+  c.beginPath();
+  c.ellipse(bx + 23, by + C.BUNNY_H - 2 - legOffset, 2.2, 1.1, 0, 0, Math.PI * 2);
+  c.fill();
+}
+
 export function drawIdlePreview(
   c: CanvasRenderingContext2D,
-  species: 'bunny' | 'kitten',
+  species: 'bunny' | 'kitten' | 'puppy',
 ): void {
   // Draw idle character at a fixed position, no shadow, no hat.
   const idle: DrawableState = {
@@ -559,6 +785,7 @@ export function drawIdlePreview(
     earFlapDuration: 0,
     earFlapStrength: 0,
     earSpinAngle: 0,
+    isGliding: false,
   };
   c.clearRect(0, 0, c.canvas.width, c.canvas.height);
   c.save();
@@ -570,6 +797,8 @@ export function drawIdlePreview(
   c.translate(-cx, -cy);
   if (species === 'kitten') {
     drawKittenBody(c, idle, false, false);
+  } else if (species === 'puppy') {
+    drawPuppyBody(c, idle, false, false);
   } else {
     drawBunnyBody(c, idle, false, false);
   }

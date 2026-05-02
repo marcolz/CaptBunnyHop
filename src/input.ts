@@ -32,11 +32,15 @@ function handleInput(): void {
     startGame();
   } else if (game.status === 'playing') {
     bunny.jump();
+    bunny.setGlideHeld(true);
   }
 }
 
 function handleRelease(): void {
-  if (game.status === 'playing') bunny.releaseJump();
+  if (game.status === 'playing') {
+    bunny.releaseJump();
+    bunny.setGlideHeld(false);
+  }
 }
 
 const DUCK_ZONE_FRACTION = 2 / 3;

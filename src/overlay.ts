@@ -1,7 +1,7 @@
 import { STARTUP_QUOTES } from './config';
 import { game, getCurrentName, setSpecies, type Species } from './state';
 import { score, getHistory } from './score';
-import { startJingle, stopJingle, playGameOverJingle, playMeow, initAudio } from './audio';
+import { startJingle, stopJingle, playGameOverJingle, playMeow, playWoof, initAudio } from './audio';
 import { drawIdlePreview } from './bunny';
 
 export type OverlayMode = 'splash' | 'character_select' | 'waiting' | 'game_over';
@@ -17,8 +17,10 @@ const overlayCharacterRow = document.getElementById('overlay-character-row') as 
 const bunnyNameLabel = document.getElementById('bunny-name-label') as HTMLLabelElement;
 const charBtnBunny = document.getElementById('char-btn-bunny') as HTMLButtonElement;
 const charBtnKitten = document.getElementById('char-btn-kitten') as HTMLButtonElement;
+const charBtnPuppy = document.getElementById('char-btn-puppy') as HTMLButtonElement;
 const charPreviewBunny = document.getElementById('char-preview-bunny') as HTMLCanvasElement;
 const charPreviewKitten = document.getElementById('char-preview-kitten') as HTMLCanvasElement;
+const charPreviewPuppy = document.getElementById('char-preview-puppy') as HTMLCanvasElement;
 export const bunnyNameInput = document.getElementById('bunny-name') as HTMLInputElement;
 
 let onCharacterChosen: ((s: Species) => void) | null = null;
@@ -26,13 +28,16 @@ let onCharacterChosen: ((s: Species) => void) | null = null;
 function paintPreviews(): void {
   const cb = charPreviewBunny.getContext('2d');
   const ck = charPreviewKitten.getContext('2d');
+  const cp = charPreviewPuppy.getContext('2d');
   if (cb) drawIdlePreview(cb, 'bunny');
   if (ck) drawIdlePreview(ck, 'kitten');
+  if (cp) drawIdlePreview(cp, 'puppy');
 }
 
 function updateSelectedHighlight(): void {
   charBtnBunny.classList.toggle('selected', game.species === 'bunny');
   charBtnKitten.classList.toggle('selected', game.species === 'kitten');
+  charBtnPuppy.classList.toggle('selected', game.species === 'puppy');
 }
 
 charBtnBunny.addEventListener('click', () => {
@@ -46,6 +51,13 @@ charBtnKitten.addEventListener('click', () => {
   initAudio();
   playMeow();
   if (onCharacterChosen) onCharacterChosen('kitten');
+});
+charBtnPuppy.addEventListener('click', () => {
+  setSpecies('puppy');
+  updateSelectedHighlight();
+  initAudio();
+  playWoof();
+  if (onCharacterChosen) onCharacterChosen('puppy');
 });
 
 export function setOnCharacterChosen(fn: (s: Species) => void): void {
@@ -90,7 +102,10 @@ export function showOverlay(mode: OverlayMode): void {
     overlaySub.style.display = 'none';
     overlayNameRow.style.display = 'flex';
     overlayCharacterRow.style.display = 'none';
-    bunnyNameLabel.textContent = game.species === 'kitten' ? 'Name your kitten:' : 'Name your bunny:';
+    bunnyNameLabel.textContent =
+      game.species === 'kitten' ? 'Name your kitten:' :
+      game.species === 'puppy' ? 'Name your puppy:' :
+      'Name your bunny:';
     bunnyNameInput.value = getCurrentName();
     overlayScores.textContent = (score.high > 0 ? `Best: ${score.high} • ` : '') + 'Press Space or Tap to Start';
     overlayLb.innerHTML = '';
@@ -101,7 +116,10 @@ export function showOverlay(mode: OverlayMode): void {
     overlayTitle.textContent = 'GAME OVER';
     overlaySub.style.display = '';
     const name = getCurrentName();
-    const noun = game.species === 'kitten' ? 'kitten' : 'bunny';
+    const noun =
+      game.species === 'kitten' ? 'kitten' :
+      game.species === 'puppy' ? 'puppy' :
+      'bunny';
     overlaySub.textContent = name
       ? `${name} scored ${score.current}!`
       : `Your ${noun} scored ${score.current}!`;

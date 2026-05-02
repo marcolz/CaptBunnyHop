@@ -62,6 +62,42 @@ export function playMeow(): void {
   osc.stop(t0 + 0.55);
 }
 
+export function playWoof(): void {
+  if (!audioCtx) return;
+  const ctx = audioCtx;
+  const t0 = ctx.currentTime;
+
+  // Two short barks: "wuf-wuf". Each is a quick low-pitched burst with a snappy decay.
+  const playBark = (start: number, basePitch: number): void => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.Q.value = 6;
+    filter.frequency.setValueAtTime(900, start);
+    filter.frequency.linearRampToValueAtTime(500, start + 0.10);
+
+    osc.type = 'sawtooth';
+    // Quick "wu-uff" pitch arc: jump up then drop.
+    osc.frequency.setValueAtTime(basePitch * 0.9, start);
+    osc.frequency.linearRampToValueAtTime(basePitch * 1.15, start + 0.03);
+    osc.frequency.linearRampToValueAtTime(basePitch * 0.7, start + 0.13);
+
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(0.30, start + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, start + 0.16);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(start);
+    osc.stop(start + 0.18);
+  };
+
+  playBark(t0, 220);
+  playBark(t0 + 0.18, 200);
+}
+
 export function playHitSound(): void {
   if (!audioCtx) return;
   const osc = audioCtx.createOscillator();

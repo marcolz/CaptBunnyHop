@@ -1,5 +1,5 @@
 import { C } from './config';
-import { game, setCurrentName } from './state';
+import { game, setCurrentName, getCurrentName } from './state';
 import { score, saveToHistory } from './score';
 import { bunny } from './bunny';
 import { obstacles } from './obstacle';
@@ -9,7 +9,10 @@ import { initAudio, stopJingle, stopGameOverJingle, playHitSound } from './audio
 export function startGame(): boolean {
   const enteredName = (bunnyNameInput.value || '').trim().slice(0, 16);
   if (!enteredName) {
-    const noun = game.species === 'kitten' ? 'kitten' : 'bunny';
+    const noun =
+      game.species === 'kitten' ? 'kitten' :
+      game.species === 'puppy' ? 'puppy' :
+      'bunny';
     bunnyNameInput.setCustomValidity(`Please enter a ${noun} name.`);
     bunnyNameInput.reportValidity();
     bunnyNameInput.focus();
@@ -35,8 +38,7 @@ export function gameOver(): void {
   game.status = 'game_over';
   game.gameOverTime = performance.now();
   score.checkHigh();
-  const name = game.species === 'kitten' ? game.kittenName : game.bunnyName;
-  saveToHistory(name, score.current);
+  saveToHistory(getCurrentName(), score.current);
   playHitSound();
   showOverlay('game_over');
 }
