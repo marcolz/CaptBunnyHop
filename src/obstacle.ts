@@ -2,6 +2,7 @@ import { C } from './config';
 import { Bunny, Bounds } from './bunny';
 import snackUrl from './assets/snack.webp';
 import puffUrl from './assets/puff.webp';
+import pintUrl from './assets/pint.webp';
 
 const snackImg = new Image();
 snackImg.src = snackUrl;
@@ -9,7 +10,10 @@ snackImg.src = snackUrl;
 const puffImg = new Image();
 puffImg.src = puffUrl;
 
-export type ObstacleType = 'house' | 'snack' | 'puff';
+const pintImg = new Image();
+pintImg.src = pintUrl;
+
+export type ObstacleType = 'house' | 'snack' | 'puff' | 'pint';
 
 export class Obstacle {
   type: ObstacleType;
@@ -38,6 +42,12 @@ export class Obstacle {
       this.h = 53;
       this.x = C.W + 10;
       this.y = C.GROUND_Y - 100 - Math.random() * 30;
+    } else if (type === 'pint') {
+      // ice cream pint on the ground (image aspect 366:432 ≈ 0.847:1)
+      this.h = 62;
+      this.w = 53;
+      this.x = C.W + 10;
+      this.y = C.GROUND_Y - this.h;
     } else {
       // puff: cheese-puff curl on the ground (image aspect ~1.55:1)
       this.h = 42;
@@ -76,6 +86,15 @@ export class Obstacle {
         h: this.h * 0.84,
       };
     }
+    if (this.type === 'pint') {
+      // tight box around the cylindrical pint body
+      return {
+        x: this.x + this.w * 0.06,
+        y: this.y + this.h * 0.04,
+        w: this.w * 0.88,
+        h: this.h * 0.94,
+      };
+    }
     const m = 4;
     return { x: this.x + m, y: this.y + m, w: this.w - m * 2, h: this.h - m * 2 };
   }
@@ -83,6 +102,7 @@ export class Obstacle {
   draw(c: CanvasRenderingContext2D): void {
     if (this.type === 'house') this._drawHouse(c);
     else if (this.type === 'snack') this._drawSnack(c);
+    else if (this.type === 'pint') this._drawPint(c);
     else this._drawPuff(c);
   }
 
@@ -261,6 +281,17 @@ export class Obstacle {
     c.restore();
   }
 
+  _drawPint(c: CanvasRenderingContext2D): void {
+    if (pintImg.complete && pintImg.naturalWidth) {
+      c.drawImage(pintImg, this.x, this.y, this.w, this.h);
+    } else {
+      c.fillStyle = '#fff';
+      c.fillRect(this.x, this.y + this.h * 0.15, this.w, this.h * 0.85);
+      c.fillStyle = '#222';
+      c.fillRect(this.x, this.y, this.w, this.h * 0.18);
+    }
+  }
+
   _drawPuff(c: CanvasRenderingContext2D): void {
     const t = Date.now();
     const phase = (this.x + this.y) * 0.05;
@@ -301,8 +332,14 @@ export const obstacles = {
     this.distToNext -= spd * tScale;
     if (this.distToNext <= 0) {
       const r = Math.random();
-      const type: ObstacleType = r < 0.42 ? 'house' : r < 0.78 ? 'snack' : 'puff';
-      this.list.push(new Obstacle(type, spd));
+      const type: ObstacleType = r < 0.34 ? 'house' : r < 0.67 ? 'snack' : 'puff';
+      const o = new Obstacle(type, spd);
+      this.list.push(o);
+      if (type === 'puff' && Math.random() < 0.5) {
+        const pint = new Obstacle('pint', spd);
+        pint.x = o.x + o.w;
+        this.list.push(pint);
+      }
       const gap = C.OBS_MIN_GAP + Math.random() * (C.OBS_MAX_GAP - C.OBS_MIN_GAP);
       this.distToNext = gap / (spd / C.INIT_SPEED);
     }
