@@ -1,4 +1,5 @@
 import { C } from './config';
+import type { Species } from './state';
 
 export const score = {
   current: 0,
@@ -43,7 +44,7 @@ export const score = {
   },
 };
 
-export interface ScoreEntry { name: string; score: number; }
+export interface ScoreEntry { name: string; score: number; species?: Species; }
 
 const HISTORY_KEY = 'bun_history';
 
@@ -52,14 +53,16 @@ export function getHistory(): ScoreEntry[] {
   catch { return []; }
 }
 
-export function saveToHistory(name: string, current: number): void {
+export function saveToHistory(name: string, current: number, species: Species): void {
   const h = getHistory();
-  h.push({ name: name || 'Bunny', score: current });
-  const best = new Map<string, number>();
+  h.push({ name: name || 'Bunny', score: current, species });
+  const best = new Map<string, ScoreEntry>();
   for (const e of h) {
-    if ((best.get(e.name) ?? -1) < e.score) best.set(e.name, e.score);
+    const key = `${e.name}|${e.species ?? ''}`;
+    const existing = best.get(key);
+    if (!existing || existing.score < e.score) best.set(key, e);
   }
-  const deduped = Array.from(best.entries()).map(([n, s]) => ({ name: n, score: s }));
+  const deduped = Array.from(best.values());
   deduped.sort((a, b) => b.score - a.score);
   localStorage.setItem(HISTORY_KEY, JSON.stringify(deduped.slice(0, 10)));
 }

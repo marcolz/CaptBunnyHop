@@ -38,7 +38,7 @@ export function gameOver(): void {
   game.status = 'game_over';
   game.gameOverTime = performance.now();
   score.checkHigh();
-  saveToHistory(getCurrentName(), score.current);
+  saveToHistory(getCurrentName(), score.current, game.species);
   playHitSound();
   showOverlay('game_over');
 }

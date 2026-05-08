@@ -72,6 +72,10 @@ function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+function speciesIcon(s?: Species): string {
+  return s === 'kitten' ? '🐱' : s === 'puppy' ? '🐶' : s === 'bunny' ? '🐰' : '';
+}
+
 export function showOverlay(mode: OverlayMode): void {
   overlay.style.display = 'flex';
   if (mode === 'splash') {
@@ -139,7 +143,9 @@ export function showOverlay(mode: OverlayMode): void {
           tr.className = 'lb-current';
           highlighted = true;
         }
-        tr.innerHTML = `<td class="lb-rank">${i + 1}.</td><td class="lb-name">${escapeHtml(entry.name)}</td><td class="lb-score">${entry.score}</td>`;
+        const icon = speciesIcon(entry.species);
+        const iconHtml = icon ? `<span class="lb-icon">${icon}</span>` : '';
+        tr.innerHTML = `<td class="lb-rank">${i + 1}.</td><td class="lb-name">${iconHtml}${escapeHtml(entry.name)}</td><td class="lb-score">${entry.score}</td>`;
         table.appendChild(tr);
       }
       overlayLb.appendChild(table);
