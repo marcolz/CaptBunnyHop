@@ -13,8 +13,8 @@ export const C = {
   BUNNY_H: 36,
   OBS_MIN_GAP: 800,
   OBS_MAX_GAP: 1500,
-  GLIDE_GRAVITY_MULT: 0.18,
-  GLIDE_MAX_VY: 1.8,
+  GLIDE_GRAVITY_MULT: 0.14,
+  GLIDE_MAX_VY: 1.4,
 } as const;
 
 export const SPECIES_PHYSICS = {

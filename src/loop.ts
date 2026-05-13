@@ -24,12 +24,14 @@ export function startLoop(ctx: CanvasRenderingContext2D): void {
       game.speed = Math.min(C.MAX_SPEED, game.speed + C.SPEED_INC * tScale);
       score.increment(tScale);
       bg.update(game.speed, tScale);
-      bunny.update(tScale);
       obstacles.update(game.speed, tScale);
+      const prevBunnyY = bunny.y;
+      bunny.update(tScale, obstacles.list);
+      obstacles.checkBonk(bunny, prevBunnyY);
       if (obstacles.checkCollision(bunny.getBounds(), bunny)) gameOver();
     } else if (game.status === 'waiting') {
       bg.update(1.5, tScale);
-      bunny.update(tScale);
+      bunny.update(tScale, obstacles.list);
     }
     // game_over and splash: static — nothing updates
 

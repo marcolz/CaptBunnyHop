@@ -1,5 +1,6 @@
 import jingleUrl from './assets/jingle.mp3';
 import gameOverUrl from './assets/game-over.mp3';
+import powerupUrl from './assets/powerup.ogg';
 
 let audioCtx: AudioContext | null = null;
 
@@ -161,4 +162,22 @@ export function stopGameOverJingle(): void {
   if (!audio) return;
   audio.pause();
   audio.currentTime = 0;
+}
+
+let powerupEl: HTMLAudioElement | null = null;
+
+function getPowerup(): HTMLAudioElement | null {
+  if (powerupEl) return powerupEl;
+  const el = document.getElementById('powerupAudio');
+  if (!(el instanceof HTMLAudioElement)) return null;
+  if (!el.src) el.src = powerupUrl;
+  powerupEl = el;
+  return powerupEl;
+}
+
+export function playPowerupSound(): void {
+  const audio = getPowerup();
+  if (!audio) return;
+  audio.currentTime = 0;
+  audio.play().catch(err => console.log('Powerup audio play failed:', err));
 }
