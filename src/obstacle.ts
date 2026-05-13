@@ -1,11 +1,15 @@
 import { C } from './config';
 import { Bunny, Bounds } from './bunny';
 import brickUrl from './assets/brick.webp';
+import powerupBrickUrl from './assets/powerup-brick.webp';
 import puffUrl from './assets/puff.webp';
 import pintUrl from './assets/pint.webp';
 
 const brickImg = new Image();
 brickImg.src = brickUrl;
+
+const powerupBrickImg = new Image();
+powerupBrickImg.src = powerupBrickUrl;
 
 const puffImg = new Image();
 puffImg.src = puffUrl;
@@ -25,6 +29,12 @@ export class Obstacle {
   isMultiStory = false;
   garageH = 0;
   visualScale = 1;
+  isPowerupBrick = false;
+  // Floating puff state — set when a puff is spawned by bonking a powerup brick.
+  // While floating, the puff stays at its spawn x in screen-space (doesn't
+  // scroll), hovers until no brick supports it, then falls under gravity.
+  isFloating = false;
+  vy = 0;
 
   constructor(type: ObstacleType, spawnSpeed: number) {
     this.type = type;
@@ -37,8 +47,8 @@ export class Obstacle {
       this.y = C.GROUND_Y - this.h;
       this.garageH = this.isMultiStory ? 40 : 0;
     } else if (type === 'snack') {
-      // Pirate's Booty cheese brick — aspect ~1.81:1.
-      this.w = 88;
+      // Cheese brick — aspect ~2.04:1.
+      this.w = 100;
       this.h = 49;
       this.x = C.W + 10;
       // y is set by the spawn logic so platform pieces share a tier.
@@ -264,8 +274,9 @@ export class Obstacle {
   }
 
   _drawSnack(c: CanvasRenderingContext2D): void {
-    if (brickImg.complete && brickImg.naturalWidth) {
-      c.drawImage(brickImg, this.x, this.y, this.w, this.h);
+    const img = this.isPowerupBrick ? powerupBrickImg : brickImg;
+    if (img.complete && img.naturalWidth) {
+      c.drawImage(img, this.x, this.y, this.w, this.h);
     } else {
       c.fillStyle = '#f0a830';
       c.fillRect(this.x, this.y, this.w, this.h);
@@ -322,8 +333,10 @@ export const obstacles = {
   update(spd: number, tScale: number): void {
     this.distToNext -= spd * tScale;
     if (this.distToNext <= 0) {
+      // Puffs no longer spawn naturally — they only appear when a powerup
+      // brick is bonked from below. Pints still spawn as ground hazards.
       const r = Math.random();
-      const type: ObstacleType = r < 0.34 ? 'house' : r < 0.67 ? 'snack' : 'puff';
+      const type: ObstacleType = r < 0.34 ? 'house' : r < 0.67 ? 'snack' : 'pint';
       if (type === 'snack') {
         // A snack platform is 2–4 snacks placed edge-to-edge at the same height.
         // Adjacent pieces let the bunny ride seamlessly: when it walks off one,
@@ -337,22 +350,82 @@ export const obstacles = {
           const piece = new Obstacle('snack', spd);
           piece.y = platformY;
           piece.x = C.W + 10 + i * piece.w;
+          // About 1 in 7 bricks is a special "powerup" brick (visual variant).
+          if (Math.random() < 1 / 7) piece.isPowerupBrick = true;
           this.list.push(piece);
         }
       } else {
         const o = new Obstacle(type, spd);
         this.list.push(o);
-        if (type === 'puff' && Math.random() < 0.5) {
-          const pint = new Obstacle('pint', spd);
-          pint.x = o.x + o.w;
-          this.list.push(pint);
-        }
       }
       const gap = C.OBS_MIN_GAP + Math.random() * (C.OBS_MAX_GAP - C.OBS_MIN_GAP);
       this.distToNext = gap / (spd / C.INIT_SPEED);
     }
-    for (const o of this.list) o.update(spd, tScale);
+    for (const o of this.list) {
+      if (o.type === 'puff' && o.isFloating) {
+        this._updateFloatingPuff(o, tScale);
+      } else {
+        o.update(spd, tScale);
+      }
+    }
     this.list = this.list.filter(o => !o.isOffscreen());
+  },
+
+  _updateFloatingPuff(puff: Obstacle, tScale: number): void {
+    const pLeft = puff.x;
+    const pRight = puff.x + puff.w;
+    const pBottom = puff.y + puff.h;
+    // Supported if any brick's top touches the puff's bottom with x-overlap.
+    let supported = false;
+    for (const o of this.list) {
+      if (o === puff) continue;
+      if (o.type !== 'snack') continue;
+      if (Math.abs(o.y - pBottom) < 1 && o.x < pRight && o.x + o.w > pLeft) {
+        supported = true;
+        break;
+      }
+    }
+    if (supported) {
+      puff.vy = 0;
+      return;
+    }
+    // No support — fall under gravity. Stays at its spawn x in screen-space.
+    puff.vy += C.GRAVITY * tScale;
+    puff.y += puff.vy * tScale;
+    if (puff.y + puff.h >= C.GROUND_Y) {
+      puff.y = C.GROUND_Y - puff.h;
+      puff.vy = 0;
+      // Landed — becomes a normal puff: collectible and scrolls with the world.
+      puff.isFloating = false;
+    }
+  },
+
+  bonk(brick: Obstacle): void {
+    brick.isPowerupBrick = false;
+    const puff = new Obstacle('puff', 0);
+    puff.x = brick.x + (brick.w - puff.w) / 2;
+    puff.y = brick.y - puff.h;
+    puff.isFloating = true;
+    this.list.push(puff);
+  },
+
+  checkBonk(bunny: Bunny, prevY: number): void {
+    if (bunny.vy >= 0) return;
+    const bL = bunny.x + 5;
+    const bR = bunny.x + C.BUNNY_W - 5;
+    const scale = bunny.isGrown ? 2 : 1;
+    const distFromFeetToTop = (C.BUNNY_H - 4) * scale;
+    const prevTop = prevY + C.BUNNY_H - distFromFeetToTop;
+    const newTop = bunny.y + C.BUNNY_H - distFromFeetToTop;
+    for (const o of this.list) {
+      if (o.type !== 'snack' || !o.isPowerupBrick) continue;
+      const brickBottom = o.y + o.h;
+      if (prevTop > brickBottom && newTop <= brickBottom &&
+          bR > o.x && bL < o.x + o.w) {
+        this.bonk(o);
+        break;
+      }
+    }
   },
 
   checkCollision(b: Bounds, bunny: Bunny): boolean {
@@ -361,6 +434,8 @@ export const obstacles = {
       const o = this.list[i];
       // Snacks are platforms — pass-through, no kill collision.
       if (o.type === 'snack') continue;
+      // Floating puffs aren't collectible until they've dropped.
+      if (o.type === 'puff' && o.isFloating) continue;
       let ob = o.getBounds();
       // Squat-under-archway exemption only applies when ungrown; a grown
       // bunny is too tall to fit under the lintel even when squatting.

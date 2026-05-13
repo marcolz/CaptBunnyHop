@@ -25,7 +25,9 @@ export function startLoop(ctx: CanvasRenderingContext2D): void {
       score.increment(tScale);
       bg.update(game.speed, tScale);
       obstacles.update(game.speed, tScale);
+      const prevBunnyY = bunny.y;
       bunny.update(tScale, obstacles.list);
+      obstacles.checkBonk(bunny, prevBunnyY);
       if (obstacles.checkCollision(bunny.getBounds(), bunny)) gameOver();
     } else if (game.status === 'waiting') {
       bg.update(1.5, tScale);

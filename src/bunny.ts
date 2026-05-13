@@ -1,6 +1,6 @@
 import { C, SPECIES_PHYSICS } from './config';
 import { game } from './state';
-import { playJumpSound } from './audio';
+import { playJumpSound, playPowerupSound } from './audio';
 import { score } from './score';
 import type { Obstacle } from './obstacle';
 import pirateHatUrl from './assets/pirate-hat.webp';
@@ -61,6 +61,7 @@ export class Bunny {
 
   grow(): void {
     this.isGrown = true;
+    playPowerupSound();
   }
 
   ungrow(): void {
