@@ -2,6 +2,7 @@ import { C, SPECIES_PHYSICS } from './config';
 import { game } from './state';
 import { playJumpSound } from './audio';
 import { score } from './score';
+import type { Obstacle } from './obstacle';
 import pirateHatUrl from './assets/pirate-hat.webp';
 
 const PIRATE_QUERY = new URLSearchParams(location.search).get('pirate') === '1';
@@ -33,6 +34,9 @@ export class Bunny {
   earFlapStrength = 0;
   earSpinAngle = 0;
   glideHeld = false;
+  standingOn: Obstacle | null = null;
+  isGrown = false;
+  invulnerableFrames = 0;
 
   reset(): void {
     this.x = 110;
@@ -50,9 +54,26 @@ export class Bunny {
     this.earFlapStrength = 0;
     this.earSpinAngle = 0;
     this.glideHeld = false;
+    this.standingOn = null;
+    this.isGrown = false;
+    this.invulnerableFrames = 0;
+  }
+
+  grow(): void {
+    this.isGrown = true;
+  }
+
+  ungrow(): void {
+    this.isGrown = false;
+    this.invulnerableFrames = 45;
   }
 
   setGlideHeld(v: boolean): void {
+    // Letting go of glide mid-air gives a small downward kick so the puppy
+    // drops a little more quickly than a passive return to normal gravity.
+    if (!v && this.glideHeld && this.isGliding()) {
+      this.vy = Math.max(this.vy, 3);
+    }
     this.glideHeld = v;
   }
 
@@ -66,6 +87,7 @@ export class Bunny {
     const isFinalJump = this.jumpsRemaining === 1;
     this.vy = phys.jumpVel;
     this.onGround = false;
+    this.standingOn = null;
     this.jumpsRemaining--;
     this.squish = 0.7;
     this.squishTimer = 8;
@@ -90,8 +112,22 @@ export class Bunny {
     this.isSquat = false;
   }
 
-  update(tScale: number): void {
+  update(tScale: number, platforms: readonly Obstacle[] = []): void {
+    // Riding a platform: stay glued to its top; fall off when it passes under us.
+    if (this.standingOn) {
+      const p = this.standingOn;
+      const bL = this.x + 5;
+      const bR = this.x + C.BUNNY_W - 5;
+      if (bR < p.x || bL > p.x + p.w) {
+        this.standingOn = null;
+        this.onGround = false;
+      } else {
+        this.y = p.y - C.BUNNY_H;
+      }
+    }
+
     if (!this.onGround) {
+      const prevBottom = this.y + C.BUNNY_H;
       if (this.isGliding()) {
         this.vy += C.GRAVITY * C.GLIDE_GRAVITY_MULT * tScale;
         if (this.vy > C.GLIDE_MAX_VY) this.vy = C.GLIDE_MAX_VY;
@@ -99,7 +135,30 @@ export class Bunny {
         this.vy += C.GRAVITY * tScale;
       }
       this.y += this.vy * tScale;
-      if (this.y >= C.GROUND_Y - C.BUNNY_H) {
+      const newBottom = this.y + C.BUNNY_H;
+
+      // Land on a snack platform when falling through its top from above.
+      if (this.vy >= 0) {
+        const bL = this.x + 5;
+        const bR = this.x + C.BUNNY_W - 5;
+        for (const p of platforms) {
+          if (p.type !== 'snack') continue;
+          if (prevBottom <= p.y && newBottom >= p.y &&
+              bR > p.x && bL < p.x + p.w) {
+            this.y = p.y - C.BUNNY_H;
+            this.vy = 0;
+            this.onGround = true;
+            this.standingOn = p;
+            this.jumpsRemaining = SPECIES_PHYSICS[game.species].maxJumps;
+            this.squish = 1.35;
+            this.squishTimer = 8;
+            this.earSpinAngle = 0;
+            break;
+          }
+        }
+      }
+
+      if (!this.onGround && this.y >= C.GROUND_Y - C.BUNNY_H) {
         this.y = C.GROUND_Y - C.BUNNY_H;
         this.vy = 0;
         this.onGround = true;
@@ -111,6 +170,9 @@ export class Bunny {
     }
     if (this.earFlapTimer > 0) {
       this.earFlapTimer = Math.max(0, this.earFlapTimer - tScale);
+    }
+    if (this.invulnerableFrames > 0) {
+      this.invulnerableFrames = Math.max(0, this.invulnerableFrames - tScale);
     }
     if (!this.onGround && this.vy > 1.5) {
       const spinSpeed = 0.35 + Math.min(this.vy, 14) * 0.1;
@@ -133,12 +195,27 @@ export class Bunny {
   }
 
   getBounds(): Bounds {
-    const h = this.isSquat ? 16 : C.BUNNY_H - 6;
-    const yOffset = this.isSquat ? (C.BUNNY_H - 6 - h) : 4;
-    return { x: this.x + 5, y: this.y + yOffset, w: C.BUNNY_W - 10, h };
+    const scale = this.isGrown ? 2 : 1;
+    const baseH = this.isSquat ? 16 : C.BUNNY_H - 6;
+    const baseYOff = this.isSquat ? (C.BUNNY_H - 6 - baseH) : 4;
+    // Scale around the feet so the bottom of the bounds stays put.
+    const distFromFeetToTop = (C.BUNNY_H - baseYOff) * scale;
+    const h = baseH * scale;
+    const w = (C.BUNNY_W - 10) * scale;
+    const cx = this.x + C.BUNNY_W / 2;
+    return {
+      x: cx - w / 2,
+      y: this.y + C.BUNNY_H - distFromFeetToTop,
+      w,
+      h,
+    };
   }
 
   draw(c: CanvasRenderingContext2D): void {
+    // Blink during invulnerability so the recovery window reads clearly.
+    if (this.invulnerableFrames > 0 && Math.floor(this.invulnerableFrames / 4) % 2 === 0) {
+      return;
+    }
     const drawState: DrawableState = {
       x: this.x,
       y: this.y,
@@ -152,6 +229,7 @@ export class Bunny {
       earFlapStrength: this.earFlapStrength,
       earSpinAngle: this.earSpinAngle,
       isGliding: this.isGliding(),
+      isGrown: this.isGrown,
     };
     drawCharacter(c, drawState, game.species, true, true);
   }
@@ -172,6 +250,7 @@ interface DrawableState {
   earFlapStrength: number;
   earSpinAngle: number;
   isGliding: boolean;
+  isGrown: boolean;
 }
 
 export function drawCharacter(
@@ -185,8 +264,9 @@ export function drawCharacter(
   const cx = s.x + C.BUNNY_W / 2;
   const cy = s.y + C.BUNNY_H;
   c.translate(cx, cy);
-  const yScale = s.isSquat ? s.squish * 0.55 : s.squish;
-  c.scale(1, yScale);
+  const sizeScale = s.isGrown ? 2 : 1;
+  const yScale = (s.isSquat ? s.squish * 0.55 : s.squish) * sizeScale;
+  c.scale(sizeScale, yScale);
   c.translate(-cx, -cy);
 
   if (species === 'kitten') {
@@ -786,6 +866,7 @@ export function drawIdlePreview(
     earFlapStrength: 0,
     earSpinAngle: 0,
     isGliding: false,
+    isGrown: false,
   };
   c.clearRect(0, 0, c.canvas.width, c.canvas.height);
   c.save();

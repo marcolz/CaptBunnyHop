@@ -1,11 +1,11 @@
 import { C } from './config';
 import { Bunny, Bounds } from './bunny';
-import snackUrl from './assets/snack.webp';
+import brickUrl from './assets/brick.webp';
 import puffUrl from './assets/puff.webp';
 import pintUrl from './assets/pint.webp';
 
-const snackImg = new Image();
-snackImg.src = snackUrl;
+const brickImg = new Image();
+brickImg.src = brickUrl;
 
 const puffImg = new Image();
 puffImg.src = puffUrl;
@@ -37,11 +37,12 @@ export class Obstacle {
       this.y = C.GROUND_Y - this.h;
       this.garageH = this.isMultiStory ? 40 : 0;
     } else if (type === 'snack') {
-      // aspect ratio of snack is ~1340:793 ≈ 1.69:1
-      this.w = 90;
-      this.h = 53;
+      // Pirate's Booty cheese brick — aspect ~1.81:1.
+      this.w = 88;
+      this.h = 49;
       this.x = C.W + 10;
-      this.y = C.GROUND_Y - 100 - Math.random() * 30;
+      // y is set by the spawn logic so platform pieces share a tier.
+      this.y = C.GROUND_Y - 100;
     } else if (type === 'pint') {
       // ice cream pint on the ground (image aspect 366:432 ≈ 0.847:1)
       this.h = 62;
@@ -78,12 +79,12 @@ export class Obstacle {
       };
     }
     if (this.type === 'snack') {
-      // collision on bag body only, not the wings (outer ~28% each side)
+      // Brick is a tight rectangle; small margin for the soft edge highlight.
       return {
-        x: this.x + this.w * 0.28,
-        y: this.y + this.h * 0.08,
-        w: this.w * 0.44,
-        h: this.h * 0.84,
+        x: this.x + this.w * 0.04,
+        y: this.y + this.h * 0.06,
+        w: this.w * 0.92,
+        h: this.h * 0.88,
       };
     }
     if (this.type === 'pint') {
@@ -263,22 +264,12 @@ export class Obstacle {
   }
 
   _drawSnack(c: CanvasRenderingContext2D): void {
-    const t = Date.now();
-    const bob = Math.sin(t / 220) * 3;
-    const tilt = Math.sin(t / 340) * 0.06;
-    const cx = this.x + this.w / 2;
-    const cy = this.y + this.h / 2 + bob;
-    c.save();
-    c.translate(cx, cy);
-    c.rotate(tilt);
-    if (snackImg.complete && snackImg.naturalWidth) {
-      c.drawImage(snackImg, -this.w / 2, -this.h / 2, this.w, this.h);
+    if (brickImg.complete && brickImg.naturalWidth) {
+      c.drawImage(brickImg, this.x, this.y, this.w, this.h);
     } else {
-      // fallback while image loads
-      c.fillStyle = '#ff8c1a';
-      c.fillRect(-this.w / 2, -this.h / 2, this.w, this.h);
+      c.fillStyle = '#f0a830';
+      c.fillRect(this.x, this.y, this.w, this.h);
     }
-    c.restore();
   }
 
   _drawPint(c: CanvasRenderingContext2D): void {
@@ -333,12 +324,29 @@ export const obstacles = {
     if (this.distToNext <= 0) {
       const r = Math.random();
       const type: ObstacleType = r < 0.34 ? 'house' : r < 0.67 ? 'snack' : 'puff';
-      const o = new Obstacle(type, spd);
-      this.list.push(o);
-      if (type === 'puff' && Math.random() < 0.5) {
-        const pint = new Obstacle('pint', spd);
-        pint.x = o.x + o.w;
-        this.list.push(pint);
+      if (type === 'snack') {
+        // A snack platform is 2–4 snacks placed edge-to-edge at the same height.
+        // Adjacent pieces let the bunny ride seamlessly: when it walks off one,
+        // the same-frame landing check immediately catches the next one.
+        const pieces = 2 + Math.floor(Math.random() * 3);
+        // Two tiers: low (reachable from ground) and high (best reached from low tier).
+        const platformY = Math.random() < 0.5
+          ? C.GROUND_Y - 100 - Math.random() * 30   // low tier:  top 100–130 above ground
+          : C.GROUND_Y - 145 - Math.random() * 15;  // high tier: top 145–160 above ground
+        for (let i = 0; i < pieces; i++) {
+          const piece = new Obstacle('snack', spd);
+          piece.y = platformY;
+          piece.x = C.W + 10 + i * piece.w;
+          this.list.push(piece);
+        }
+      } else {
+        const o = new Obstacle(type, spd);
+        this.list.push(o);
+        if (type === 'puff' && Math.random() < 0.5) {
+          const pint = new Obstacle('pint', spd);
+          pint.x = o.x + o.w;
+          this.list.push(pint);
+        }
       }
       const gap = C.OBS_MIN_GAP + Math.random() * (C.OBS_MAX_GAP - C.OBS_MIN_GAP);
       this.distToNext = gap / (spd / C.INIT_SPEED);
@@ -348,14 +356,33 @@ export const obstacles = {
   },
 
   checkCollision(b: Bounds, bunny: Bunny): boolean {
-    for (const o of this.list) {
+    if (bunny.invulnerableFrames > 0) return false;
+    for (let i = this.list.length - 1; i >= 0; i--) {
+      const o = this.list[i];
+      // Snacks are platforms — pass-through, no kill collision.
+      if (o.type === 'snack') continue;
       let ob = o.getBounds();
-      if (o.type === 'house' && o.isMultiStory && bunny && bunny.isSquat) {
+      // Squat-under-archway exemption only applies when ungrown; a grown
+      // bunny is too tall to fit under the lintel even when squatting.
+      if (o.type === 'house' && o.isMultiStory && bunny && bunny.isSquat && !bunny.isGrown) {
         const m = 4;
         ob = { x: o.x + m, y: o.y + m, w: o.w - m * 2, h: o.h - o.garageH - m };
       }
-      if (b.x < ob.x + ob.w && b.x + b.w > ob.x &&
-          b.y < ob.y + ob.h && b.y + b.h > ob.y) return true;
+      const hit = b.x < ob.x + ob.w && b.x + b.w > ob.x &&
+                  b.y < ob.y + ob.h && b.y + b.h > ob.y;
+      if (!hit) continue;
+      if (o.type === 'puff') {
+        // Power-up: grow the bunny and consume the puff.
+        bunny.grow();
+        this.list.splice(i, 1);
+        continue;
+      }
+      // Any other kill obstacle (house, pint).
+      if (bunny.isGrown) {
+        bunny.ungrow();
+        return false;
+      }
+      return true;
     }
     return false;
   },

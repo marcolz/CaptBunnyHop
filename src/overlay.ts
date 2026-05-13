@@ -65,7 +65,7 @@ export function setOnCharacterChosen(fn: (s: Species) => void): void {
 }
 
 function getRandomQuote(): string {
-  return STARTUP_QUOTES[Math.floor(Math.random() * STARTUP_QUOTES.length)];
+  return `“${STARTUP_QUOTES[Math.floor(Math.random() * STARTUP_QUOTES.length)]}”`;
 }
 
 function escapeHtml(s: string): string {
