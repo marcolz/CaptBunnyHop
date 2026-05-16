@@ -118,9 +118,7 @@ export function bindInput(canvas: HTMLCanvasElement): void {
     }
     e.preventDefault();
     const touch = e.changedTouches[0];
-    // Panda doesn't squat; bottom-zone reservation would steal taps and break the kick swipe.
-    const canDuck = game.species !== 'panda';
-    if (game.status === 'playing' && canDuck && isInDuckZone(touch.clientY)) {
+    if (game.status === 'playing' && isInDuckZone(touch.clientY)) {
       duckTouchId = touch.identifier;
       bunny.squat();
     } else {

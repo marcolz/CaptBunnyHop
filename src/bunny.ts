@@ -183,8 +183,6 @@ export class Bunny {
   }
 
   squat(): void {
-    // Panda has no squat — its low-profile move is the flying kick.
-    if (game.species === 'panda') return;
     if (this.onGround) this.isSquat = true;
   }
 
