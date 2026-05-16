@@ -42,10 +42,19 @@ export class Bunny {
   kickCooldownTimer = 0;
   kickUsedThisJump = false;
   kickStartX = 0;
-  // Anime-style 功夫 flash. Counted in frames; outlives the kick itself so the
-  // characters linger on screen for dramatic effect.
-  kickFlashTimer = 0;
-  kickFlashDuration = 0;
+  // Generic action-flash slot: one signature-move callout drawn in the HUD per
+  // species. Kind drives which drawer renders the flash, timer/duration drive
+  // the pop-in / settle / fade-out animation. Puppy holds at "settle" for the
+  // duration of the glide rather than running the timer down.
+  actionFlashTimer = 0;
+  actionFlashDuration = 0;
+  actionFlashKind: 'panda' | 'bunny' | 'kitten' | 'puppy' | null = null;
+  actionFlashFiredThisJump = false;
+  // Tracks how long the input button has been held since takeoff — drives the
+  // kitten's "committed to a tall jump" detection.
+  jumpHoldTimer = 0;
+  // Edge-detect glide transitions for the puppy's persistent VOLARE! flash.
+  wasGliding = false;
 
   reset(): void {
     this.x = 110;
@@ -71,8 +80,12 @@ export class Bunny {
     this.kickCooldownTimer = 0;
     this.kickUsedThisJump = false;
     this.kickStartX = 0;
-    this.kickFlashTimer = 0;
-    this.kickFlashDuration = 0;
+    this.actionFlashTimer = 0;
+    this.actionFlashDuration = 0;
+    this.actionFlashKind = null;
+    this.actionFlashFiredThisJump = false;
+    this.jumpHoldTimer = 0;
+    this.wasGliding = false;
   }
 
   kick(): void {
@@ -95,8 +108,9 @@ export class Bunny {
     }
     // 功夫 flash stays visible for the full kick + cooldown window, then fades
     // out just as the kick becomes available again.
-    this.kickFlashDuration = C.PANDA_KICK_DURATION_FRAMES + C.PANDA_KICK_COOLDOWN_FRAMES;
-    this.kickFlashTimer = this.kickFlashDuration;
+    this.actionFlashKind = 'panda';
+    this.actionFlashDuration = C.PANDA_KICK_DURATION_FRAMES + C.PANDA_KICK_COOLDOWN_FRAMES;
+    this.actionFlashTimer = this.actionFlashDuration;
     playPandaKick();
   }
 
@@ -127,6 +141,7 @@ export class Bunny {
     if (this.jumpsRemaining <= 0) return;
     const phys = SPECIES_PHYSICS[game.species];
     const isFinalJump = this.jumpsRemaining === 1;
+    const wasFirstJumpFromGround = this.onGround;
     this.vy = phys.jumpVel;
     this.onGround = false;
     this.standingOn = null;
@@ -138,7 +153,26 @@ export class Bunny {
     this.earFlapTimer = this.earFlapDuration;
     // Panda's mid-air kick budget refills with each new jump.
     this.kickUsedThisJump = false;
+    // Reset per-jump flash latch + hold-time tracker on every fresh jump (incl.
+    // double-hop) so kitten/bunny callouts can re-fire on the next leap.
+    this.actionFlashFiredThisJump = false;
+    this.jumpHoldTimer = 0;
+    // Bunny DOUBLE HOP! — fires on the airborne second jump only.
+    if (game.species === 'bunny' && !wasFirstJumpFromGround) {
+      this.triggerActionFlash('bunny');
+    }
     playJumpSound();
+  }
+
+  // Generic timed action-flash trigger used by bunny/kitten. Puppy manages its
+  // own persistent-while-gliding flash directly in update().
+  private triggerActionFlash(kind: 'bunny' | 'kitten'): void {
+    if (this.actionFlashFiredThisJump && this.actionFlashKind === kind) return;
+    this.actionFlashKind = kind;
+    this.actionFlashDuration =
+      C.ACTION_FLASH_POP_IN_FRAMES + C.ACTION_FLASH_HOLD_FRAMES + C.ACTION_FLASH_FADE_OUT_FRAMES;
+    this.actionFlashTimer = this.actionFlashDuration;
+    this.actionFlashFiredThisJump = true;
   }
 
   releaseJump(): void {
@@ -220,6 +254,8 @@ export class Bunny {
             this.squishTimer = 8;
             this.earSpinAngle = 0;
             this.kickUsedThisJump = false;
+            this.actionFlashFiredThisJump = false;
+            this.jumpHoldTimer = 0;
             break;
           }
         }
@@ -234,6 +270,8 @@ export class Bunny {
         this.squishTimer = 8;
         this.earSpinAngle = 0;
         this.kickUsedThisJump = false;
+        this.actionFlashFiredThisJump = false;
+        this.jumpHoldTimer = 0;
         // If we somehow land mid-kick (lunge dropped us onto the floor), cancel it.
         this.isKicking = false;
         this.kickTimer = 0;
@@ -248,8 +286,57 @@ export class Bunny {
     if (this.kickCooldownTimer > 0) {
       this.kickCooldownTimer = Math.max(0, this.kickCooldownTimer - tScale);
     }
-    if (this.kickFlashTimer > 0) {
-      this.kickFlashTimer = Math.max(0, this.kickFlashTimer - tScale);
+
+    // Hold-time tracker: counts frames the button has been held while airborne
+    // since takeoff. Drives kitten's "committed to a tall jump" trigger.
+    if (!this.onGround && this.glideHeld) {
+      this.jumpHoldTimer += tScale;
+    } else if (this.onGround) {
+      this.jumpHoldTimer = 0;
+    }
+
+    // Kitten ALLEZ HOP! — fires once the kitten has held past the cutoff
+    // window and is locked into a full-height jump.
+    if (
+      game.species === 'kitten' &&
+      !this.onGround &&
+      this.glideHeld &&
+      !this.actionFlashFiredThisJump &&
+      this.jumpHoldTimer >= C.KITTEN_HOLD_THRESHOLD_FRAMES
+    ) {
+      this.triggerActionFlash('kitten');
+    }
+
+    // Puppy VOLARE! — persistent while gliding. Pop in on glide start, hold at
+    // settle while glide continues, fade out when glide ends.
+    const gliding = this.isGliding();
+    if (game.species === 'puppy') {
+      if (gliding && !this.wasGliding) {
+        this.actionFlashKind = 'puppy';
+        // Duration is just pop-in + a sentinel hold; the dispatcher freezes
+        // progress at settle while gliding stays true.
+        this.actionFlashDuration = C.ACTION_FLASH_POP_IN_FRAMES + C.ACTION_FLASH_HOLD_FRAMES;
+        this.actionFlashTimer = this.actionFlashDuration;
+      } else if (gliding && this.actionFlashKind === 'puppy') {
+        // Clamp so we never drop below the start of the fade phase.
+        const minHold = C.ACTION_FLASH_FADE_OUT_FRAMES + 1;
+        if (this.actionFlashTimer < minHold) this.actionFlashTimer = minHold;
+      } else if (!gliding && this.wasGliding && this.actionFlashKind === 'puppy') {
+        // Glide ended — clip to a fresh fade-out window.
+        if (this.actionFlashTimer > C.ACTION_FLASH_FADE_OUT_FRAMES) {
+          this.actionFlashTimer = C.ACTION_FLASH_FADE_OUT_FRAMES;
+          this.actionFlashDuration = C.ACTION_FLASH_FADE_OUT_FRAMES;
+        }
+      }
+    }
+    this.wasGliding = gliding;
+
+    if (this.actionFlashTimer > 0) {
+      this.actionFlashTimer = Math.max(0, this.actionFlashTimer - tScale);
+      if (this.actionFlashTimer === 0) {
+        this.actionFlashKind = null;
+        this.actionFlashDuration = 0;
+      }
     }
     if (!this.onGround && this.vy > 1.5) {
       const spinSpeed = 0.35 + Math.min(this.vy, 14) * 0.1;
@@ -323,70 +410,302 @@ export class Bunny {
     drawCharacter(c, drawState, game.species, true, true);
   }
 
-  // Anime-style 功夫 (gōngfū) flash. Stays on screen for the full kick + cooldown
-  // window, then fades out just as the kick becomes available again — so the
-  // characters visually represent the cooldown state.
-  drawKickFlash(c: CanvasRenderingContext2D): void {
-    if (this.kickFlashTimer <= 0 || this.kickFlashDuration <= 0) return;
-    // t = 0 at trigger, 1 right before disappearing
-    const t = 1 - this.kickFlashTimer / this.kickFlashDuration;
+  // Dispatcher: each species has its own signature-move flash. Anchored to the
+  // same upper-right HUD slot so it never collides with the score readout.
+  drawActionFlash(c: CanvasRenderingContext2D): void {
+    if (this.actionFlashTimer <= 0 || this.actionFlashDuration <= 0) return;
+    if (this.actionFlashKind === null) return;
 
-    // Map the dramatic pop-in onto the kick frames (~19% of total when
-    // duration = 14 + 60 = 74), then hold for the cooldown, and fade out in the
-    // last ~8% (~6 frames ≈ 100 ms) so the disappearance reads as "ready again".
-    const kickFrac = C.PANDA_KICK_DURATION_FRAMES / this.kickFlashDuration;
-    const popEnd = kickFrac * 0.55;       // pop in
-    const settleEnd = kickFrac * 0.95;    // settle
-    const fadeStart = 1 - 0.08;           // last ~6 frames
+    const cx = 605;
+    const cy = 110;
 
-    let scale: number;
-    let alpha: number;
-    if (t < popEnd) {
-      const p = t / popEnd;
-      scale = p * 1.25;
-      alpha = p;
-    } else if (t < settleEnd) {
-      const p = (t - popEnd) / (settleEnd - popEnd);
-      scale = 1.25 - p * 0.25;
-      alpha = 1;
-    } else if (t < fadeStart) {
-      scale = 1;
-      alpha = 1;
-    } else {
-      const p = (t - fadeStart) / (1 - fadeStart);
-      scale = 1 + p * 0.15;
-      alpha = 1 - p;
+    // Puppy's flash holds at "settle" while gliding. We freeze progress just
+    // past pop-in until the glide ends (which clips timer to a fade window).
+    const isPuppyHeld =
+      this.actionFlashKind === 'puppy' && this.isGliding();
+
+    let t = 1 - this.actionFlashTimer / this.actionFlashDuration;
+    if (isPuppyHeld) {
+      const popFrac = C.ACTION_FLASH_POP_IN_FRAMES / this.actionFlashDuration;
+      // Park progress just into the settle band.
+      t = Math.max(t, popFrac + 0.001);
+      t = Math.min(t, 1 - (C.ACTION_FLASH_FADE_OUT_FRAMES / this.actionFlashDuration) - 0.001);
     }
 
-    const cx = 605; // upper-right of canvas, clear of the score readout
-    const cy = 110;
-    const charSize = 56;
-    const ROT = 17 * Math.PI / 180;
+    let phases: { popEnd: number; settleEnd: number; fadeStart: number };
+    if (this.actionFlashKind === 'panda') {
+      // Panda keeps its anime-pop-on-kick-then-hold-through-cooldown timing.
+      const kickFrac = C.PANDA_KICK_DURATION_FRAMES / this.actionFlashDuration;
+      phases = {
+        popEnd: kickFrac * 0.55,
+        settleEnd: kickFrac * 0.95,
+        fadeStart: 1 - 0.08,
+      };
+    } else {
+      const popEnd = C.ACTION_FLASH_POP_IN_FRAMES / this.actionFlashDuration;
+      const fadeStart = 1 - (C.ACTION_FLASH_FADE_OUT_FRAMES / this.actionFlashDuration);
+      const settleEnd = Math.min(popEnd + 0.08, fadeStart);
+      phases = { popEnd, settleEnd, fadeStart };
+    }
+
+    const { scale, alpha } = flashScaleAlpha(t, phases);
 
     c.save();
     c.globalAlpha = alpha;
     c.translate(cx, cy);
-    c.rotate(ROT);
-    c.scale(scale, scale);
-
-    // Red chop-stamp rectangle behind the characters
-    c.fillStyle = 'rgba(192,40,42,0.92)';
-    c.fillRect(-44, -64, 88, 128);
-    // Thin darker red border
-    c.strokeStyle = 'rgba(120,20,20,0.95)';
-    c.lineWidth = 2;
-    c.strokeRect(-44, -64, 88, 128);
-
-    // Black calligraphy characters on top — 功 (top) and 夫 (bottom)
-    c.fillStyle = '#0a0a0a';
-    c.font = `bold ${charSize}px "STSong", "Songti SC", "SimSun", "Noto Serif CJK SC", serif`;
-    c.textAlign = 'center';
-    c.textBaseline = 'middle';
-    c.fillText('功', 0, -28);
-    c.fillText('夫', 0, 32);
-
+    switch (this.actionFlashKind) {
+      case 'panda':
+        drawPandaKickFlash(c, scale);
+        break;
+      case 'bunny':
+        drawBunnyDoubleHopFlash(c, scale);
+        break;
+      case 'kitten':
+        drawKittenAllezHopFlash(c, scale);
+        break;
+      case 'puppy':
+        drawPuppyVolareFlash(c, scale);
+        break;
+    }
     c.restore();
   }
+}
+
+// Three-phase pop-in / settle / fade-out shared by all four character flashes.
+function flashScaleAlpha(
+  t: number,
+  { popEnd, settleEnd, fadeStart }: { popEnd: number; settleEnd: number; fadeStart: number },
+): { scale: number; alpha: number } {
+  if (t < popEnd) {
+    const p = t / popEnd;
+    return { scale: p * 1.25, alpha: p };
+  }
+  if (t < settleEnd) {
+    const p = (t - popEnd) / Math.max(settleEnd - popEnd, 1e-6);
+    return { scale: 1.25 - p * 0.25, alpha: 1 };
+  }
+  if (t < fadeStart) {
+    return { scale: 1, alpha: 1 };
+  }
+  const p = (t - fadeStart) / Math.max(1 - fadeStart, 1e-6);
+  return { scale: 1 + p * 0.15, alpha: 1 - p };
+}
+
+// Panda: anime-style red chop-stamp with vertical 功夫 calligraphy, tilted 17°.
+function drawPandaKickFlash(c: CanvasRenderingContext2D, scale: number): void {
+  const ROT = (17 * Math.PI) / 180;
+  c.save();
+  c.rotate(ROT);
+  c.scale(scale, scale);
+  c.fillStyle = 'rgba(192,40,42,0.92)';
+  c.fillRect(-44, -64, 88, 128);
+  c.strokeStyle = 'rgba(120,20,20,0.95)';
+  c.lineWidth = 2;
+  c.strokeRect(-44, -64, 88, 128);
+  c.fillStyle = '#0a0a0a';
+  c.font = 'bold 56px "STSong", "Songti SC", "SimSun", "Noto Serif CJK SC", serif';
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.fillText('功', 0, -28);
+  c.fillText('夫', 0, 32);
+  c.restore();
+}
+
+// Bunny: comic-book yellow starburst with bold DOUBLE HOP! text.
+function drawBunnyDoubleHopFlash(c: CanvasRenderingContext2D, scale: number): void {
+  const ROT = (-10 * Math.PI) / 180;
+  c.save();
+  c.rotate(ROT);
+  c.scale(scale, scale);
+
+  // 10-spike jagged starburst, alternating outer/inner radii.
+  const spikes = 10;
+  const rOuter = 78;
+  const rInner = 50;
+  c.beginPath();
+  for (let i = 0; i < spikes * 2; i++) {
+    const r = i % 2 === 0 ? rOuter : rInner;
+    const a = (i / (spikes * 2)) * Math.PI * 2 - Math.PI / 2;
+    const x = Math.cos(a) * r;
+    const y = Math.sin(a) * r * 0.7; // squashed vertically for a flatter burst
+    if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+  }
+  c.closePath();
+  c.fillStyle = '#ffd23a';
+  c.fill();
+  c.lineWidth = 3;
+  c.strokeStyle = '#1a1a1a';
+  c.stroke();
+
+  // Inner highlight ring for a touch of depth.
+  c.beginPath();
+  for (let i = 0; i < spikes * 2; i++) {
+    const r = i % 2 === 0 ? rOuter * 0.78 : rInner * 0.78;
+    const a = (i / (spikes * 2)) * Math.PI * 2 - Math.PI / 2;
+    const x = Math.cos(a) * r;
+    const y = Math.sin(a) * r * 0.7;
+    if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+  }
+  c.closePath();
+  c.fillStyle = '#fff09a';
+  c.fill();
+
+  // Text: bold + outlined for the comic-burst look.
+  c.font = 'bold italic 22px "Impact", "Arial Black", "Helvetica Neue", sans-serif';
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.lineWidth = 5;
+  c.strokeStyle = '#1a1a1a';
+  c.strokeText('DOUBLE', 0, -10);
+  c.strokeText('HOP!', 0, 16);
+  c.fillStyle = '#ffffff';
+  c.fillText('DOUBLE', 0, -10);
+  c.fillText('HOP!', 0, 16);
+
+  c.restore();
+}
+
+// Kitten: French circus poster — red/white striped banner, navy border, italic
+// serif ALLEZ HOP! in deep red. Tilted -8° for a poster-pasted feel.
+function drawKittenAllezHopFlash(c: CanvasRenderingContext2D, scale: number): void {
+  const ROT = (-8 * Math.PI) / 180;
+  c.save();
+  c.rotate(ROT);
+  c.scale(scale, scale);
+
+  const w = 132;
+  const h = 64;
+  const x0 = -w / 2;
+  const y0 = -h / 2;
+
+  // White base.
+  c.fillStyle = '#fafafa';
+  c.fillRect(x0, y0, w, h);
+
+  // Vertical red stripes (4 stripes spanning the banner).
+  const stripeW = w / 8;
+  c.fillStyle = '#c8202a';
+  for (let i = 0; i < 4; i++) {
+    const sx = x0 + i * 2 * stripeW;
+    c.fillRect(sx, y0, stripeW, h);
+  }
+
+  // Navy rope border.
+  c.strokeStyle = '#1d3a8a';
+  c.lineWidth = 3;
+  c.strokeRect(x0, y0, w, h);
+  // Inner hairline for a poster-pasted feel.
+  c.strokeStyle = 'rgba(29,58,138,0.45)';
+  c.lineWidth = 1;
+  c.strokeRect(x0 + 4, y0 + 4, w - 8, h - 8);
+
+  // Title text: deep red serif italic, with a faint white halo so it reads
+  // against the alternating stripes.
+  c.font = 'bold italic 22px "Bodoni 72", "Didot", "Playfair Display", "Georgia", serif';
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.lineWidth = 4;
+  c.strokeStyle = '#fafafa';
+  c.strokeText('ALLEZ', 0, -12);
+  c.strokeText('HOP!', 0, 14);
+  c.fillStyle = '#7a0d14';
+  c.fillText('ALLEZ', 0, -12);
+  c.fillText('HOP!', 0, 14);
+
+  c.restore();
+}
+
+// Puppy: sky-blue ribbon with a green/white/red tricolor under-stripe, white
+// VOLARE! text with a soft motion shadow and two speed-lines.
+function drawPuppyVolareFlash(c: CanvasRenderingContext2D, scale: number): void {
+  const ROT = (-4 * Math.PI) / 180;
+  c.save();
+  c.rotate(ROT);
+  c.scale(scale, scale);
+
+  const w = 150;
+  const h = 56;
+  const x0 = -w / 2;
+  const y0 = -h / 2;
+  const r = 14;
+
+  // Sky-blue ribbon body with a vertical gradient.
+  const grad = c.createLinearGradient(0, y0, 0, y0 + h);
+  grad.addColorStop(0, '#7ec8ff');
+  grad.addColorStop(1, '#3a8ee0');
+  c.fillStyle = grad;
+  roundedRect(c, x0, y0, w, h, r);
+  c.fill();
+
+  // White soft inner highlight along the top.
+  c.fillStyle = 'rgba(255,255,255,0.32)';
+  roundedRect(c, x0 + 6, y0 + 4, w - 12, h * 0.35, r * 0.6);
+  c.fill();
+
+  // Tricolor under-stripe (green / white / red).
+  const stripeH = 5;
+  const stripeY = y0 + h - stripeH - 4;
+  const segW = (w - 24) / 3;
+  c.fillStyle = '#008c45';
+  c.fillRect(x0 + 12, stripeY, segW, stripeH);
+  c.fillStyle = '#f4f5f0';
+  c.fillRect(x0 + 12 + segW, stripeY, segW, stripeH);
+  c.fillStyle = '#cd212a';
+  c.fillRect(x0 + 12 + segW * 2, stripeY, segW, stripeH);
+
+  // Outline.
+  c.strokeStyle = 'rgba(20,40,80,0.85)';
+  c.lineWidth = 2;
+  roundedRect(c, x0, y0, w, h, r);
+  c.stroke();
+
+  // Speed lines flanking the text.
+  c.strokeStyle = 'rgba(255,255,255,0.7)';
+  c.lineWidth = 2;
+  c.lineCap = 'round';
+  for (let i = 0; i < 3; i++) {
+    const yy = -8 + i * 6;
+    c.beginPath();
+    c.moveTo(x0 + 6, yy);
+    c.lineTo(x0 + 18, yy);
+    c.stroke();
+    c.beginPath();
+    c.moveTo(-x0 - 18, yy);
+    c.lineTo(-x0 - 6, yy);
+    c.stroke();
+  }
+
+  // VOLARE! — white italic serif with soft trailing shadow for a flight feel.
+  c.font = 'bold italic 26px "Georgia", "Playfair Display", serif';
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.fillStyle = 'rgba(0,0,0,0.25)';
+  c.fillText('VOLARE!', 3, 3);
+  c.fillStyle = '#ffffff';
+  c.fillText('VOLARE!', 0, 0);
+
+  c.restore();
+}
+
+function roundedRect(
+  c: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+): void {
+  c.beginPath();
+  c.moveTo(x + r, y);
+  c.lineTo(x + w - r, y);
+  c.quadraticCurveTo(x + w, y, x + w, y + r);
+  c.lineTo(x + w, y + h - r);
+  c.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  c.lineTo(x + r, y + h);
+  c.quadraticCurveTo(x, y + h, x, y + h - r);
+  c.lineTo(x, y + r);
+  c.quadraticCurveTo(x, y, x + r, y);
+  c.closePath();
 }
 
 export const bunny = new Bunny();

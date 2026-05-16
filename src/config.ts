@@ -21,6 +21,15 @@ export const C = {
   PANDA_KICK_REACH: 40,
   PANDA_SWIPE_THRESHOLD_PX: 30,
   PANDA_RECENTER_RATE: 0.04,
+  // Kitten ALLEZ HOP! fires after the button has been held long enough that the
+  // kitten has committed past its jump cutoff velocity and is going for a tall
+  // jump (kitten vy reaches cutoff ≈ -5.5 from -13.8 in ~15 frames @ G=0.55).
+  KITTEN_HOLD_THRESHOLD_FRAMES: 16,
+  // Generic action-flash timings used by bunny / kitten / puppy. Panda keeps
+  // its own kick+cooldown timing for backwards-compat with the existing feel.
+  ACTION_FLASH_POP_IN_FRAMES: 8,
+  ACTION_FLASH_HOLD_FRAMES: 38,
+  ACTION_FLASH_FADE_OUT_FRAMES: 12,
 } as const;
 
 export const SPECIES_PHYSICS = {
