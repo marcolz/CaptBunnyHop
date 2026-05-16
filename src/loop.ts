@@ -28,6 +28,8 @@ export function startLoop(ctx: CanvasRenderingContext2D): void {
       const prevBunnyY = bunny.y;
       bunny.update(tScale, obstacles.list);
       obstacles.checkBonk(bunny, prevBunnyY);
+      if (bunny.isKicking) obstacles.destroyOverlapping(bunny.getBounds());
+      obstacles.updateEffects(tScale);
       if (obstacles.checkCollision(bunny.getBounds(), bunny)) gameOver();
     } else if (game.status === 'waiting') {
       bg.update(1.5, tScale);
@@ -41,7 +43,9 @@ export function startLoop(ctx: CanvasRenderingContext2D): void {
     obstacles.draw(ctx);
     bunny.draw(ctx);
     obstacles.drawForeground(ctx);
+    obstacles.drawEffects(ctx);
     score.draw(ctx);
+    bunny.drawKickFlash(ctx);
   }
 
   requestAnimationFrame(loop);

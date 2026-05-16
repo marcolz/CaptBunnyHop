@@ -1,6 +1,6 @@
 import { C, SPECIES_PHYSICS } from './config';
 import { game } from './state';
-import { playJumpSound, playPowerupSound } from './audio';
+import { playJumpSound, playPowerupSound, playPandaKick } from './audio';
 import { score } from './score';
 import type { Obstacle } from './obstacle';
 import pirateHatUrl from './assets/pirate-hat.webp';
@@ -37,6 +37,15 @@ export class Bunny {
   standingOn: Obstacle | null = null;
   isGrown = false;
   invulnerableFrames = 0;
+  isKicking = false;
+  kickTimer = 0;
+  kickCooldownTimer = 0;
+  kickUsedThisJump = false;
+  kickStartX = 0;
+  // Anime-style 功夫 flash. Counted in frames; outlives the kick itself so the
+  // characters linger on screen for dramatic effect.
+  kickFlashTimer = 0;
+  kickFlashDuration = 0;
 
   reset(): void {
     this.x = 110;
@@ -57,6 +66,38 @@ export class Bunny {
     this.standingOn = null;
     this.isGrown = false;
     this.invulnerableFrames = 0;
+    this.isKicking = false;
+    this.kickTimer = 0;
+    this.kickCooldownTimer = 0;
+    this.kickUsedThisJump = false;
+    this.kickStartX = 0;
+    this.kickFlashTimer = 0;
+    this.kickFlashDuration = 0;
+  }
+
+  kick(): void {
+    // Panda-only flying kick. Works from ground OR mid-air. Limited by a real
+    // cooldown so it can't be spammed.
+    if (game.species !== 'panda') return;
+    if (this.isKicking) return;
+    if (this.kickCooldownTimer > 0) return;
+    if (this.kickUsedThisJump) return;
+    this.isKicking = true;
+    this.kickTimer = C.PANDA_KICK_DURATION_FRAMES;
+    this.kickUsedThisJump = true;
+    this.kickStartX = this.x;
+    // Small upward kick adds a "hang" visual. When launched from the ground,
+    // also lift off so the vy actually applies.
+    this.vy = -1.5;
+    if (this.onGround) {
+      this.onGround = false;
+      this.standingOn = null;
+    }
+    // 功夫 flash stays visible for the full kick + cooldown window, then fades
+    // out just as the kick becomes available again.
+    this.kickFlashDuration = C.PANDA_KICK_DURATION_FRAMES + C.PANDA_KICK_COOLDOWN_FRAMES;
+    this.kickFlashTimer = this.kickFlashDuration;
+    playPandaKick();
   }
 
   grow(): void {
@@ -95,6 +136,8 @@ export class Bunny {
     this.earFlapStrength = isFinalJump ? 1.15 : 0.7;
     this.earFlapDuration = isFinalJump ? 14 : 9;
     this.earFlapTimer = this.earFlapDuration;
+    // Panda's mid-air kick budget refills with each new jump.
+    this.kickUsedThisJump = false;
     playJumpSound();
   }
 
@@ -106,6 +149,8 @@ export class Bunny {
   }
 
   squat(): void {
+    // Panda has no squat — its low-profile move is the flying kick.
+    if (game.species === 'panda') return;
     if (this.onGround) this.isSquat = true;
   }
 
@@ -114,6 +159,23 @@ export class Bunny {
   }
 
   update(tScale: number, platforms: readonly Obstacle[] = []): void {
+    // Panda flying kick: lunges forward and dampens gravity for the kick frames.
+    if (this.isKicking) {
+      this.x += (C.PANDA_KICK_LUNGE_DX / C.PANDA_KICK_DURATION_FRAMES) * tScale;
+      this.kickTimer -= tScale;
+      if (this.kickTimer <= 0) {
+        this.kickTimer = 0;
+        this.isKicking = false;
+        // Start the cooldown — kick can't be re-triggered until it expires.
+        this.kickCooldownTimer = C.PANDA_KICK_COOLDOWN_FRAMES;
+        // Drop out of the kick — small downward push so the panda visibly falls.
+        this.vy = Math.max(this.vy, 3);
+      }
+    } else if (this.x > 110) {
+      // Spring-back to the home x so chained kicks can't drive the panda off the right edge.
+      const pull = (this.x - 110) * C.PANDA_RECENTER_RATE * tScale;
+      this.x = Math.max(110, this.x - pull);
+    }
     // Riding a platform: stay glued to its top; fall off when it passes under us.
     if (this.standingOn) {
       const p = this.standingOn;
@@ -129,7 +191,10 @@ export class Bunny {
 
     if (!this.onGround) {
       const prevBottom = this.y + C.BUNNY_H;
-      if (this.isGliding()) {
+      if (this.isKicking) {
+        // Dampen gravity during the kick so the panda "hangs" mid-air briefly.
+        this.vy += C.GRAVITY * 0.25 * tScale;
+      } else if (this.isGliding()) {
         this.vy += C.GRAVITY * C.GLIDE_GRAVITY_MULT * tScale;
         if (this.vy > C.GLIDE_MAX_VY) this.vy = C.GLIDE_MAX_VY;
       } else {
@@ -154,6 +219,7 @@ export class Bunny {
             this.squish = 1.35;
             this.squishTimer = 8;
             this.earSpinAngle = 0;
+            this.kickUsedThisJump = false;
             break;
           }
         }
@@ -167,6 +233,10 @@ export class Bunny {
         this.squish = 1.35;
         this.squishTimer = 8;
         this.earSpinAngle = 0;
+        this.kickUsedThisJump = false;
+        // If we somehow land mid-kick (lunge dropped us onto the floor), cancel it.
+        this.isKicking = false;
+        this.kickTimer = 0;
       }
     }
     if (this.earFlapTimer > 0) {
@@ -174,6 +244,12 @@ export class Bunny {
     }
     if (this.invulnerableFrames > 0) {
       this.invulnerableFrames = Math.max(0, this.invulnerableFrames - tScale);
+    }
+    if (this.kickCooldownTimer > 0) {
+      this.kickCooldownTimer = Math.max(0, this.kickCooldownTimer - tScale);
+    }
+    if (this.kickFlashTimer > 0) {
+      this.kickFlashTimer = Math.max(0, this.kickFlashTimer - tScale);
     }
     if (!this.onGround && this.vy > 1.5) {
       const spinSpeed = 0.35 + Math.min(this.vy, 14) * 0.1;
@@ -196,6 +272,17 @@ export class Bunny {
   }
 
   getBounds(): Bounds {
+    if (this.isKicking) {
+      // Mid-air kick hitbox: extends forward (kick leg) and down to ground level
+      // so a kick above an obstacle still smashes it.
+      const scale = this.isGrown ? 2 : 1;
+      const cx = this.x + C.BUNNY_W / 2;
+      const left = cx - (C.BUNNY_W / 2) * scale;
+      const right = cx + (C.BUNNY_W / 2 + C.PANDA_KICK_REACH) * scale;
+      const top = this.y + 4 * scale;
+      const bottom = C.GROUND_Y;
+      return { x: left, y: top, w: right - left, h: bottom - top };
+    }
     const scale = this.isGrown ? 2 : 1;
     const baseH = this.isSquat ? 16 : C.BUNNY_H - 6;
     const baseYOff = this.isSquat ? (C.BUNNY_H - 6 - baseH) : 4;
@@ -231,8 +318,74 @@ export class Bunny {
       earSpinAngle: this.earSpinAngle,
       isGliding: this.isGliding(),
       isGrown: this.isGrown,
+      isKicking: this.isKicking,
     };
     drawCharacter(c, drawState, game.species, true, true);
+  }
+
+  // Anime-style 功夫 (gōngfū) flash. Stays on screen for the full kick + cooldown
+  // window, then fades out just as the kick becomes available again — so the
+  // characters visually represent the cooldown state.
+  drawKickFlash(c: CanvasRenderingContext2D): void {
+    if (this.kickFlashTimer <= 0 || this.kickFlashDuration <= 0) return;
+    // t = 0 at trigger, 1 right before disappearing
+    const t = 1 - this.kickFlashTimer / this.kickFlashDuration;
+
+    // Map the dramatic pop-in onto the kick frames (~19% of total when
+    // duration = 14 + 60 = 74), then hold for the cooldown, and fade out in the
+    // last ~8% (~6 frames ≈ 100 ms) so the disappearance reads as "ready again".
+    const kickFrac = C.PANDA_KICK_DURATION_FRAMES / this.kickFlashDuration;
+    const popEnd = kickFrac * 0.55;       // pop in
+    const settleEnd = kickFrac * 0.95;    // settle
+    const fadeStart = 1 - 0.08;           // last ~6 frames
+
+    let scale: number;
+    let alpha: number;
+    if (t < popEnd) {
+      const p = t / popEnd;
+      scale = p * 1.25;
+      alpha = p;
+    } else if (t < settleEnd) {
+      const p = (t - popEnd) / (settleEnd - popEnd);
+      scale = 1.25 - p * 0.25;
+      alpha = 1;
+    } else if (t < fadeStart) {
+      scale = 1;
+      alpha = 1;
+    } else {
+      const p = (t - fadeStart) / (1 - fadeStart);
+      scale = 1 + p * 0.15;
+      alpha = 1 - p;
+    }
+
+    const cx = 605; // upper-right of canvas, clear of the score readout
+    const cy = 110;
+    const charSize = 56;
+    const ROT = 17 * Math.PI / 180;
+
+    c.save();
+    c.globalAlpha = alpha;
+    c.translate(cx, cy);
+    c.rotate(ROT);
+    c.scale(scale, scale);
+
+    // Red chop-stamp rectangle behind the characters
+    c.fillStyle = 'rgba(192,40,42,0.92)';
+    c.fillRect(-44, -64, 88, 128);
+    // Thin darker red border
+    c.strokeStyle = 'rgba(120,20,20,0.95)';
+    c.lineWidth = 2;
+    c.strokeRect(-44, -64, 88, 128);
+
+    // Black calligraphy characters on top — 功 (top) and 夫 (bottom)
+    c.fillStyle = '#0a0a0a';
+    c.font = `bold ${charSize}px "STSong", "Songti SC", "SimSun", "Noto Serif CJK SC", serif`;
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText('功', 0, -28);
+    c.fillText('夫', 0, 32);
+
+    c.restore();
   }
 }
 
@@ -252,12 +405,13 @@ interface DrawableState {
   earSpinAngle: number;
   isGliding: boolean;
   isGrown: boolean;
+  isKicking: boolean;
 }
 
 export function drawCharacter(
   c: CanvasRenderingContext2D,
   s: DrawableState,
-  species: 'bunny' | 'kitten' | 'puppy',
+  species: 'bunny' | 'kitten' | 'puppy' | 'panda',
   withShadow: boolean,
   withHat: boolean,
 ): void {
@@ -274,6 +428,8 @@ export function drawCharacter(
     drawKittenBody(c, s, withShadow, withHat);
   } else if (species === 'puppy') {
     drawPuppyBody(c, s, withShadow, withHat);
+  } else if (species === 'panda') {
+    drawPandaBody(c, s, withShadow, withHat);
   } else {
     drawBunnyBody(c, s, withShadow, withHat);
   }
@@ -849,9 +1005,298 @@ function drawPuppyBody(
   c.fill();
 }
 
+function drawPandaBody(
+  c: CanvasRenderingContext2D,
+  s: DrawableState,
+  withShadow: boolean,
+  withHat: boolean,
+): void {
+  const bx = s.x;
+  const by = s.y;
+  const hop = s.hopFrame;
+
+  const WHITE = '#f5f5f0';
+  const WHITE_SHADE = '#e0ddd2';
+  const BLACK = '#1a1a1a';
+  const BLACK_SOFT = '#2a2a2a';
+  const SASH = '#c0282a';
+  const SASH_DARK = '#8a1c1e';
+
+  if (withShadow) {
+    c.fillStyle = 'rgba(0,0,0,0.15)';
+    c.beginPath();
+    const shadowW = s.isKicking ? 18 : 14;
+    c.ellipse(bx + C.BUNNY_W / 2, C.GROUND_Y + 2, shadowW, 4, 0, 0, Math.PI * 2);
+    c.fill();
+  }
+
+  if (s.isKicking) {
+    // Flying kick: body tilted ~10° forward, one leg extended forward (right),
+    // arms tucked, motion streaks behind, chi spark at the foot.
+    const bodyCx = bx + C.BUNNY_W / 2;
+    const bodyCy = by + C.BUNNY_H - 14;
+
+    // Motion streaks behind (to the left of the panda)
+    c.strokeStyle = 'rgba(120,110,100,0.45)';
+    c.lineWidth = 1.4;
+    for (let i = 0; i < 3; i++) {
+      const sy = bodyCy - 6 + i * 5;
+      c.beginPath();
+      c.moveTo(bx - 4 - i * 4, sy);
+      c.lineTo(bx - 14 - i * 6, sy + 0.5);
+      c.stroke();
+    }
+    c.lineWidth = 1;
+
+    c.save();
+    c.translate(bodyCx, bodyCy);
+    c.rotate(0.18); // ~10° forward tilt
+
+    // Tucked back leg (small black oval behind)
+    c.fillStyle = BLACK;
+    c.beginPath();
+    c.ellipse(-4, 6, 5, 4, 0.4, 0, Math.PI * 2);
+    c.fill();
+
+    // Body — white round
+    c.fillStyle = WHITE;
+    c.beginPath();
+    c.ellipse(0, 0, 14, 16, 0, 0, Math.PI * 2);
+    c.fill();
+
+    // Belly highlight
+    c.fillStyle = WHITE_SHADE;
+    c.beginPath();
+    c.ellipse(1, 4, 6, 8, 0.1, 0, Math.PI * 2);
+    c.fill();
+
+    // Tucked arms (small black ovals near shoulders)
+    c.fillStyle = BLACK;
+    c.beginPath();
+    c.ellipse(-7, -2, 3, 5, -0.4, 0, Math.PI * 2);
+    c.fill();
+    c.beginPath();
+    c.ellipse(7, -2, 3, 5, 0.4, 0, Math.PI * 2);
+    c.fill();
+
+    // Red kung-fu sash diagonal
+    c.fillStyle = SASH;
+    c.fillRect(-13, -2, 26, 4);
+    c.fillStyle = SASH_DARK;
+    c.fillRect(-13, 1.5, 26, 0.7);
+
+    // Extended kick leg — straight out to the right
+    c.fillStyle = BLACK;
+    c.beginPath();
+    c.ellipse(18, 2, 12, 4, 0, 0, Math.PI * 2);
+    c.fill();
+    // Foot at the tip
+    c.fillStyle = BLACK_SOFT;
+    c.beginPath();
+    c.ellipse(29, 2, 4, 3, 0, 0, Math.PI * 2);
+    c.fill();
+
+    // Head — white circle
+    c.fillStyle = WHITE;
+    c.beginPath();
+    c.arc(2, -16, 10, 0, Math.PI * 2);
+    c.fill();
+    // Ears
+    c.fillStyle = BLACK;
+    c.beginPath();
+    c.arc(-5, -23, 3.5, 0, Math.PI * 2);
+    c.fill();
+    c.beginPath();
+    c.arc(9, -23, 3.5, 0, Math.PI * 2);
+    c.fill();
+    // Eye patches
+    c.fillStyle = BLACK_SOFT;
+    c.beginPath();
+    c.ellipse(-2, -17, 3, 3.5, -0.3, 0, Math.PI * 2);
+    c.fill();
+    c.beginPath();
+    c.ellipse(6, -17, 3, 3.5, 0.3, 0, Math.PI * 2);
+    c.fill();
+    // Pupils — looking forward (toward the kick)
+    c.fillStyle = 'white';
+    c.beginPath();
+    c.arc(-1, -17, 1.1, 0, Math.PI * 2);
+    c.fill();
+    c.beginPath();
+    c.arc(7, -17, 1.1, 0, Math.PI * 2);
+    c.fill();
+    c.fillStyle = BLACK;
+    c.beginPath();
+    c.arc(0, -17, 0.6, 0, Math.PI * 2);
+    c.fill();
+    c.beginPath();
+    c.arc(8, -17, 0.6, 0, Math.PI * 2);
+    c.fill();
+    // Nose
+    c.fillStyle = BLACK;
+    c.beginPath();
+    c.ellipse(3, -12, 1.6, 1.3, 0, 0, Math.PI * 2);
+    c.fill();
+    // Open-mouth yell — small white "O"
+    c.fillStyle = '#3a1a1a';
+    c.beginPath();
+    c.ellipse(4, -9, 1.6, 1.4, 0, 0, Math.PI * 2);
+    c.fill();
+
+    c.restore();
+
+    // Chi spark at the kick foot — bright starburst
+    const sparkX = bx + C.BUNNY_W / 2 + 30;
+    const sparkY = bodyCy + 5;
+    c.fillStyle = 'rgba(255,255,200,0.85)';
+    c.beginPath();
+    c.arc(sparkX, sparkY, 3, 0, Math.PI * 2);
+    c.fill();
+    c.strokeStyle = 'rgba(255,240,150,0.9)';
+    c.lineWidth = 1.2;
+    for (let i = 0; i < 4; i++) {
+      const a = (Math.PI / 2) * i + 0.4;
+      c.beginPath();
+      c.moveTo(sparkX + Math.cos(a) * 1.5, sparkY + Math.sin(a) * 1.5);
+      c.lineTo(sparkX + Math.cos(a) * 6, sparkY + Math.sin(a) * 6);
+      c.stroke();
+    }
+    c.lineWidth = 1;
+    return;
+  }
+
+  // Standing panda
+
+  // Small white tail nub
+  c.fillStyle = WHITE;
+  c.beginPath();
+  c.arc(bx + 5, by + C.BUNNY_H - 14, 3, 0, Math.PI * 2);
+  c.fill();
+
+  // Back legs (black) — hop animation
+  const legOffset = s.onGround ? [0, 3, 0, -3][hop] : 0;
+  c.fillStyle = BLACK;
+  c.beginPath();
+  c.ellipse(bx + 9, by + C.BUNNY_H - 4 + legOffset, 6.5, 5, s.onGround ? 0.2 : -0.4, 0, Math.PI * 2);
+  c.fill();
+  c.beginPath();
+  c.ellipse(bx + 22, by + C.BUNNY_H - 4 - legOffset, 6, 4.5, -0.2, 0, Math.PI * 2);
+  c.fill();
+
+  // Body (white round)
+  c.fillStyle = WHITE;
+  c.beginPath();
+  c.ellipse(bx + C.BUNNY_W / 2, by + C.BUNNY_H - 14, 14, 16, 0, 0, Math.PI * 2);
+  c.fill();
+
+  // Belly highlight
+  c.fillStyle = WHITE_SHADE;
+  c.beginPath();
+  c.ellipse(bx + C.BUNNY_W / 2 + 1, by + C.BUNNY_H - 10, 6, 8, 0.1, 0, Math.PI * 2);
+  c.fill();
+
+  // Black "arms" — short black ovals at shoulders
+  c.fillStyle = BLACK;
+  c.beginPath();
+  c.ellipse(bx + 6, by + C.BUNNY_H - 16, 4, 7, -0.2, 0, Math.PI * 2);
+  c.fill();
+  c.beginPath();
+  c.ellipse(bx + C.BUNNY_W - 6, by + C.BUNNY_H - 16, 4, 7, 0.2, 0, Math.PI * 2);
+  c.fill();
+
+  // Red kung-fu sash — diagonal across chest
+  c.save();
+  c.translate(bx + C.BUNNY_W / 2, by + C.BUNNY_H - 14);
+  c.rotate(-0.35);
+  c.fillStyle = SASH;
+  c.fillRect(-14, -2, 28, 4);
+  c.fillStyle = SASH_DARK;
+  c.fillRect(-14, 1.5, 28, 0.7);
+  c.fillStyle = SASH;
+  c.beginPath();
+  c.arc(11, 0, 2.5, 0, Math.PI * 2);
+  c.fill();
+  c.restore();
+
+  // Head — white circle
+  const headCx = bx + C.BUNNY_W / 2 + 1;
+  const headCy = by + 22;
+  c.fillStyle = WHITE;
+  c.beginPath();
+  c.arc(headCx, headCy, 12.5, 0, Math.PI * 2);
+  c.fill();
+
+  // Black ears on top
+  c.fillStyle = BLACK;
+  c.beginPath();
+  c.arc(headCx - 9, headCy - 9, 4.5, 0, Math.PI * 2);
+  c.fill();
+  c.beginPath();
+  c.arc(headCx + 9, headCy - 9, 4.5, 0, Math.PI * 2);
+  c.fill();
+
+  if (withHat) {
+    const showHat = (PIRATE_QUERY || score.current >= PIRATE_SCORE_THRESHOLD);
+    if (showHat && pirateHatImg.complete) {
+      const hatW = 44;
+      const hatH = 30;
+      const hatCx = bx + C.BUNNY_W / 2 + 1;
+      const hatCy = by - 6;
+      c.drawImage(pirateHatImg, hatCx - hatW / 2, hatCy - hatH / 2, hatW, hatH);
+    }
+  }
+
+  // Eye patches — signature panda look
+  c.fillStyle = BLACK_SOFT;
+  c.beginPath();
+  c.ellipse(headCx - 5, headCy - 1, 3.5, 4.5, -0.3, 0, Math.PI * 2);
+  c.fill();
+  c.beginPath();
+  c.ellipse(headCx + 5, headCy - 1, 3.5, 4.5, 0.3, 0, Math.PI * 2);
+  c.fill();
+
+  // Eyes (white dot inside each patch + pupil)
+  c.fillStyle = 'white';
+  c.beginPath();
+  c.arc(headCx - 5, headCy - 1, 1.4, 0, Math.PI * 2);
+  c.fill();
+  c.beginPath();
+  c.arc(headCx + 5, headCy - 1, 1.4, 0, Math.PI * 2);
+  c.fill();
+  c.fillStyle = BLACK;
+  c.beginPath();
+  c.arc(headCx - 5, headCy - 1, 0.7, 0, Math.PI * 2);
+  c.fill();
+  c.beginPath();
+  c.arc(headCx + 5, headCy - 1, 0.7, 0, Math.PI * 2);
+  c.fill();
+
+  // Nose
+  c.fillStyle = BLACK;
+  c.beginPath();
+  c.ellipse(headCx, headCy + 4, 2, 1.6, 0, 0, Math.PI * 2);
+  c.fill();
+
+  // Mouth
+  c.strokeStyle = BLACK_SOFT;
+  c.lineWidth = 1;
+  c.beginPath();
+  c.moveTo(headCx, headCy + 5.5);
+  c.lineTo(headCx, headCy + 7);
+  c.stroke();
+  c.beginPath();
+  c.moveTo(headCx, headCy + 7);
+  c.quadraticCurveTo(headCx - 2, headCy + 8.5, headCx - 3, headCy + 7.5);
+  c.stroke();
+  c.beginPath();
+  c.moveTo(headCx, headCy + 7);
+  c.quadraticCurveTo(headCx + 2, headCy + 8.5, headCx + 3, headCy + 7.5);
+  c.stroke();
+}
+
 export function drawIdlePreview(
   c: CanvasRenderingContext2D,
-  species: 'bunny' | 'kitten' | 'puppy',
+  species: 'bunny' | 'kitten' | 'puppy' | 'panda',
 ): void {
   // Draw idle character at a fixed position, no shadow, no hat.
   const idle: DrawableState = {
@@ -868,6 +1313,7 @@ export function drawIdlePreview(
     earSpinAngle: 0,
     isGliding: false,
     isGrown: false,
+    isKicking: false,
   };
   c.clearRect(0, 0, c.canvas.width, c.canvas.height);
   c.save();
@@ -881,6 +1327,8 @@ export function drawIdlePreview(
     drawKittenBody(c, idle, false, false);
   } else if (species === 'puppy') {
     drawPuppyBody(c, idle, false, false);
+  } else if (species === 'panda') {
+    drawPandaBody(c, idle, false, false);
   } else {
     drawBunnyBody(c, idle, false, false);
   }

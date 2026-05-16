@@ -2,6 +2,7 @@ import { C } from './config';
 import { game, setCurrentName, getCurrentName } from './state';
 import { score, saveToHistory } from './score';
 import { bunny } from './bunny';
+import { bg } from './background';
 import { obstacles } from './obstacle';
 import { showOverlay, hideOverlay, bunnyNameInput } from './overlay';
 import { initAudio, stopJingle, stopGameOverJingle, playHitSound } from './audio';
@@ -12,6 +13,7 @@ export function startGame(): boolean {
     const noun =
       game.species === 'kitten' ? 'kitten' :
       game.species === 'puppy' ? 'puppy' :
+      game.species === 'panda' ? 'panda' :
       'bunny';
     bunnyNameInput.setCustomValidity(`Please enter a ${noun} name.`);
     bunnyNameInput.reportValidity();
@@ -30,6 +32,7 @@ export function startGame(): boolean {
   score.reset();
   bunny.reset();
   obstacles.reset();
+  bg.reset();
   hideOverlay();
   return true;
 }
@@ -51,6 +54,7 @@ export function goToCharacterSelect(): void {
   score.reset();
   bunny.reset();
   obstacles.reset();
+  bg.reset();
   showOverlay('character_select');
 }
 
@@ -62,5 +66,6 @@ export function goToWelcome(): void {
   score.reset();
   bunny.reset();
   obstacles.reset();
+  bg.reset();
   showOverlay('waiting');
 }

@@ -4,29 +4,32 @@ import wildflowerUrl from './assets/wildflower.webp';
 const wildflowerImg = new Image();
 wildflowerImg.src = wildflowerUrl;
 
-// One repeat every FLOWER_SPAN px of scroll keeps the wildflower pattern sparse.
-const FLOWER_SPAN = 1800;
+// A single big lupine clump appears once at the start of each run, then scrolls
+// off the left edge and never repeats.
+const FLOWER_START_X = 180;
+const FLOWER_SIZE = 120;
+const FLOWER_Y_OFFSET = 11;
 
 export const bg = {
   cloudX: [100, 280, 500, 680],
   cloudY: [30, 55, 40, 25],
   cloudW: [80, 100, 70, 90],
   dotX: [50, 150, 250, 350, 450, 550, 650, 750],
-  // Wildflower clumps along the ground — varied size + jitter for organic feel.
-  // Mix of two sizes: a tall lupine bunch and a smaller clump.
-  flowerX: [180, 1080],
-  flowerS: [120, 70],
-  flowerYO: [11, 2],
   offset1: 0,
   offset2: 0,
-  offset3: 0,
+  flowerX: FLOWER_START_X, // absolute screen-x; decreases as world scrolls, stops once off-screen
+
+  reset(): void {
+    this.flowerX = FLOWER_START_X;
+  },
 
   update(spd: number, tScale: number): void {
     this.offset1 = (this.offset1 + spd * 0.25 * tScale) % C.W;
     this.offset2 = (this.offset2 + spd * 0.55 * tScale) % C.W;
-    // Flowers scroll at world speed; separate offset because the pattern wraps
-    // at FLOWER_SPAN, not C.W.
-    this.offset3 = (this.offset3 + spd * tScale) % FLOWER_SPAN;
+    // Wildflower scrolls left with the world until it leaves the canvas, then stays put.
+    if (this.flowerX > -FLOWER_SIZE) {
+      this.flowerX -= spd * tScale;
+    }
   },
 
   draw(c: CanvasRenderingContext2D): void {
@@ -68,15 +71,11 @@ export const bg = {
       c.fill();
     }
 
-    // Wildflowers — scattered along the grass at varied sizes for an organic look.
-    if (wildflowerImg.complete && wildflowerImg.naturalWidth) {
+    // Wildflower — one big lupine clump at the start of each run.
+    if (wildflowerImg.complete && wildflowerImg.naturalWidth && this.flowerX > -FLOWER_SIZE) {
       const baseY = C.GROUND_Y + 8; // leafy base nestles into the grass strip
-      for (let i = 0; i < this.flowerX.length; i++) {
-        const fx = ((this.flowerX[i] - this.offset3 + FLOWER_SPAN * 2) % FLOWER_SPAN) - 100;
-        const fs = this.flowerS[i];
-        const fy = baseY + this.flowerYO[i] - fs;
-        c.drawImage(wildflowerImg, fx, fy, fs, fs);
-      }
+      const fy = baseY + FLOWER_Y_OFFSET - FLOWER_SIZE;
+      c.drawImage(wildflowerImg, this.flowerX, fy, FLOWER_SIZE, FLOWER_SIZE);
     }
   },
 

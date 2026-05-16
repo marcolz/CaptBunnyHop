@@ -1,6 +1,8 @@
 import jingleUrl from './assets/jingle.mp3';
 import gameOverUrl from './assets/game-over.mp3';
 import powerupUrl from './assets/powerup.ogg';
+import pandaSelectUrl from './assets/panda-select.ogg';
+import pandaKickUrl from './assets/panda-kick.ogg';
 
 let audioCtx: AudioContext | null = null;
 
@@ -99,6 +101,61 @@ export function playWoof(): void {
   playBark(t0 + 0.18, 200);
 }
 
+export function playHiya(): void {
+  if (!audioCtx) return;
+  const ctx = audioCtx;
+  const t0 = ctx.currentTime;
+
+  // Burst 1 — "hi": short square tone at ~520 Hz
+  const osc1 = ctx.createOscillator();
+  const gain1 = ctx.createGain();
+  osc1.type = 'square';
+  osc1.frequency.setValueAtTime(520, t0);
+  gain1.gain.setValueAtTime(0.0001, t0);
+  gain1.gain.exponentialRampToValueAtTime(0.15, t0 + 0.005);
+  gain1.gain.exponentialRampToValueAtTime(0.001, t0 + 0.09);
+  osc1.connect(gain1);
+  gain1.connect(ctx.destination);
+  osc1.start(t0);
+  osc1.stop(t0 + 0.1);
+
+  // Burst 2 — "YA": triangle sweeping 380 → 240 Hz
+  const t1 = t0 + 0.11;
+  const osc2 = ctx.createOscillator();
+  const gain2 = ctx.createGain();
+  osc2.type = 'triangle';
+  osc2.frequency.setValueAtTime(380, t1);
+  osc2.frequency.linearRampToValueAtTime(240, t1 + 0.14);
+  gain2.gain.setValueAtTime(0.0001, t1);
+  gain2.gain.exponentialRampToValueAtTime(0.22, t1 + 0.01);
+  gain2.gain.exponentialRampToValueAtTime(0.001, t1 + 0.15);
+  osc2.connect(gain2);
+  gain2.connect(ctx.destination);
+  osc2.start(t1);
+  osc2.stop(t1 + 0.16);
+
+  // Brief noise burst for shout texture
+  const bufferSize = Math.floor(ctx.sampleRate * 0.05);
+  const noiseBuf = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = noiseBuf.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1);
+  const noise = ctx.createBufferSource();
+  noise.buffer = noiseBuf;
+  const noiseFilter = ctx.createBiquadFilter();
+  noiseFilter.type = 'bandpass';
+  noiseFilter.frequency.value = 900;
+  noiseFilter.Q.value = 2;
+  const noiseGain = ctx.createGain();
+  noiseGain.gain.setValueAtTime(0.0001, t1);
+  noiseGain.gain.exponentialRampToValueAtTime(0.08, t1 + 0.005);
+  noiseGain.gain.exponentialRampToValueAtTime(0.001, t1 + 0.05);
+  noise.connect(noiseFilter);
+  noiseFilter.connect(noiseGain);
+  noiseGain.connect(ctx.destination);
+  noise.start(t1);
+  noise.stop(t1 + 0.06);
+}
+
 export function playHitSound(): void {
   if (!audioCtx) return;
   const osc = audioCtx.createOscillator();
@@ -180,4 +237,40 @@ export function playPowerupSound(): void {
   if (!audio) return;
   audio.currentTime = 0;
   audio.play().catch(err => console.log('Powerup audio play failed:', err));
+}
+
+let pandaSelectEl: HTMLAudioElement | null = null;
+
+function getPandaSelect(): HTMLAudioElement | null {
+  if (pandaSelectEl) return pandaSelectEl;
+  const el = document.getElementById('pandaSelectAudio');
+  if (!(el instanceof HTMLAudioElement)) return null;
+  if (!el.src) el.src = pandaSelectUrl;
+  pandaSelectEl = el;
+  return pandaSelectEl;
+}
+
+export function playPandaSelect(): void {
+  const audio = getPandaSelect();
+  if (!audio) return;
+  audio.currentTime = 0;
+  audio.play().catch(err => console.log('Panda select audio play failed:', err));
+}
+
+let pandaKickEl: HTMLAudioElement | null = null;
+
+function getPandaKick(): HTMLAudioElement | null {
+  if (pandaKickEl) return pandaKickEl;
+  const el = document.getElementById('pandaKickAudio');
+  if (!(el instanceof HTMLAudioElement)) return null;
+  if (!el.src) el.src = pandaKickUrl;
+  pandaKickEl = el;
+  return pandaKickEl;
+}
+
+export function playPandaKick(): void {
+  const audio = getPandaKick();
+  if (!audio) return;
+  audio.currentTime = 0;
+  audio.play().catch(err => console.log('Panda kick audio play failed:', err));
 }

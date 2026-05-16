@@ -190,7 +190,7 @@
     <canvas id="game"></canvas>
     <div id="overlay">
       <div id="overlay-whats-new">
-        <span class="wn-label">WHAT'S NEW:</span> OH WOW! Version 2 is out. Cheesy platforms and power ups! It's about to get fun!!
+        <span class="wn-label">WHAT'S NEW:</span> Meet the Kung-Fu Panda &mdash; swipe to flying-kick through obstacles!
        </div>
       <div id="overlay-content">
         <div id="overlay-title">CAPTAIN BUN HOP</div>
@@ -211,6 +211,11 @@
             <span>Puppy</span>
             <span class="char-power">Hold to glide</span>
           </button>
+          <button type="button" class="char-btn" id="char-btn-panda" data-species="panda">
+            <canvas width="64" height="64" id="char-preview-panda"></canvas>
+            <span>Panda</span>
+            <span class="char-power">Swipe to kick</span>
+          </button>
         </div>
         <div id="overlay-name-row" style="display:none;">
           <label for="bunny-name" id="bunny-name-label">Name your bunny:</label>
@@ -224,6 +229,8 @@
   <audio id="jingleAudio" preload="auto"></audio>
   <audio id="gameOverAudio" preload="auto"></audio>
   <audio id="powerupAudio" preload="auto"></audio>
+  <audio id="pandaSelectAudio" preload="auto"></audio>
+  <audio id="pandaKickAudio" preload="auto"></audio>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

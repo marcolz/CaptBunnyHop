@@ -321,12 +321,32 @@ export class Obstacle {
   }
 }
 
+// Cartoon "POW" explosion particle. Two flavors: a short-lived radial burst
+// drawn from the impact center, and small debris flecks that fly outward.
+interface Particle {
+  type: 'burst' | 'fleck';
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  maxLife: number;
+  size: number;
+  color: string;
+  rot: number;
+  rotSpeed: number;
+}
+
+const FLECK_COLORS = ['#f5f5f0', '#c8c8c0', '#404040', '#909090'];
+
 export const obstacles = {
   list: [] as Obstacle[],
+  particles: [] as Particle[],
   distToNext: 900,
 
   reset(): void {
     this.list = [];
+    this.particles = [];
     this.distToNext = 900 + Math.random() * 400;
   },
 
@@ -369,6 +389,131 @@ export const obstacles = {
       }
     }
     this.list = this.list.filter(o => !o.isOffscreen());
+  },
+
+  destroyOverlapping(b: Bounds): void {
+    // Panda flying kick: pulverize ground-stationary kill obstacles (house, pint).
+    // Snacks are platforms (not obstacles); puffs are powerups and stay collectible.
+    // Each destroyed obstacle bursts into a cartoon "POW" of debris.
+    const next: Obstacle[] = [];
+    for (const o of this.list) {
+      if (o.type !== 'house' && o.type !== 'pint') {
+        next.push(o);
+        continue;
+      }
+      const ob = o.getBounds();
+      const overlap = b.x < ob.x + ob.w && b.x + b.w > ob.x &&
+                      b.y < ob.y + ob.h && b.y + b.h > ob.y;
+      if (overlap) {
+        this._spawnExplosion(o);
+      } else {
+        next.push(o);
+      }
+    }
+    this.list = next;
+  },
+
+  _spawnExplosion(o: Obstacle): void {
+    const cx = o.x + o.w / 2;
+    const cy = o.y + o.h / 2;
+    // One radial burst at the impact center.
+    this.particles.push({
+      type: 'burst',
+      x: cx, y: cy,
+      vx: 0, vy: 0,
+      life: 18, maxLife: 18,
+      size: 32,
+      color: '',
+      rot: 0, rotSpeed: 0,
+    });
+    // 6–8 debris flecks flying outward in the upper 270° (so they don't shoot
+    // straight into the floor).
+    const fleckCount = 6 + Math.floor(Math.random() * 3);
+    for (let i = 0; i < fleckCount; i++) {
+      // Angle: random across the upper 270° (skip the 45° wedge pointing down).
+      const angle = -Math.PI + (Math.random() * Math.PI * 1.5) - Math.PI * 0.25;
+      const speed = 3 + Math.random() * 3;
+      const life = 28 + Math.random() * 14;
+      this.particles.push({
+        type: 'fleck',
+        x: cx, y: cy,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 1,
+        life, maxLife: life,
+        size: 3 + Math.random() * 3,
+        color: FLECK_COLORS[Math.floor(Math.random() * FLECK_COLORS.length)],
+        rot: 0,
+        rotSpeed: (Math.random() - 0.5) * 0.6,
+      });
+    }
+  },
+
+  updateEffects(tScale: number): void {
+    for (const p of this.particles) {
+      p.life -= tScale;
+      if (p.type === 'fleck') {
+        p.vy += 0.4 * tScale;
+        p.x += p.vx * tScale;
+        p.y += p.vy * tScale;
+        p.rot += p.rotSpeed * tScale;
+      }
+    }
+    this.particles = this.particles.filter(p => p.life > 0);
+  },
+
+  drawEffects(c: CanvasRenderingContext2D): void {
+    for (const p of this.particles) {
+      const t = 1 - p.life / p.maxLife;
+      if (p.type === 'burst') {
+        // Eased radius growth + late fade
+        const eased = 1 - (1 - t) * (1 - t);
+        const radius = p.size * eased;
+        const alpha = t < 0.6 ? 1 : Math.max(0, 1 - (t - 0.6) / 0.4);
+        c.save();
+        c.globalAlpha = alpha;
+        c.translate(p.x, p.y);
+        // 8 radial rays — yellow underlay for glow, white core on top.
+        const rays = 8;
+        for (let i = 0; i < rays; i++) {
+          const a = (Math.PI * 2 / rays) * i;
+          const x2 = Math.cos(a) * radius;
+          const y2 = Math.sin(a) * radius;
+          c.strokeStyle = '#ffd860';
+          c.lineWidth = 5;
+          c.lineCap = 'round';
+          c.beginPath();
+          c.moveTo(0, 0);
+          c.lineTo(x2, y2);
+          c.stroke();
+          c.strokeStyle = '#ffffff';
+          c.lineWidth = 2;
+          c.beginPath();
+          c.moveTo(0, 0);
+          c.lineTo(x2, y2);
+          c.stroke();
+        }
+        // Inner white disc for extra punch — fades faster than the rays.
+        const discAlpha = Math.max(0, 1 - t * 1.8);
+        if (discAlpha > 0) {
+          c.globalAlpha = alpha * discAlpha;
+          c.fillStyle = '#ffffff';
+          c.beginPath();
+          c.arc(0, 0, 4, 0, Math.PI * 2);
+          c.fill();
+        }
+        c.restore();
+      } else {
+        // Fleck — small rotating square that fades in the final 30% of life.
+        const alpha = t < 0.7 ? 1 : Math.max(0, 1 - (t - 0.7) / 0.3);
+        c.save();
+        c.globalAlpha = alpha;
+        c.translate(p.x, p.y);
+        c.rotate(p.rot);
+        c.fillStyle = p.color;
+        c.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+        c.restore();
+      }
+    }
   },
 
   _updateFloatingPuff(puff: Obstacle, tScale: number): void {

@@ -1,3 +1,4 @@
+import { C } from './config';
 import { game } from './state';
 import { bunny } from './bunny';
 import { initAudio } from './audio';
@@ -45,6 +46,8 @@ function handleRelease(): void {
 
 const DUCK_ZONE_FRACTION = 2 / 3;
 let duckTouchId: number | null = null;
+// Track the active touch for swipe-right (panda kick) gesture detection.
+let swipeTouch: { id: number; startX: number; startY: number } | null = null;
 
 export function bindInput(canvas: HTMLCanvasElement): void {
   bunnyNameInput.addEventListener('input', () => {
@@ -86,6 +89,9 @@ export function bindInput(canvas: HTMLCanvasElement): void {
     } else if (e.code === 'ArrowDown') {
       e.preventDefault();
       if (game.status === 'playing') bunny.squat();
+    } else if (e.code === 'ArrowRight') {
+      e.preventDefault();
+      if (game.status === 'playing' && game.species === 'panda') bunny.kick();
     } else if (e.code === 'Escape') {
       e.preventDefault();
       goToCharacterSelect();
@@ -112,13 +118,32 @@ export function bindInput(canvas: HTMLCanvasElement): void {
     }
     e.preventDefault();
     const touch = e.changedTouches[0];
-    if (game.status === 'playing' && isInDuckZone(touch.clientY)) {
+    // Panda doesn't squat; bottom-zone reservation would steal taps and break the kick swipe.
+    const canDuck = game.species !== 'panda';
+    if (game.status === 'playing' && canDuck && isInDuckZone(touch.clientY)) {
       duckTouchId = touch.identifier;
       bunny.squat();
     } else {
+      // Record the touch so we can detect a swipe-right (panda flying kick).
+      if (game.status === 'playing' && game.species === 'panda') {
+        swipeTouch = { id: touch.identifier, startX: touch.clientX, startY: touch.clientY };
+      }
       handleInput();
     }
   }, { passive: false });
+
+  document.addEventListener('touchmove', e => {
+    if (!swipeTouch) return;
+    for (const t of Array.from(e.changedTouches)) {
+      if (t.identifier !== swipeTouch.id) continue;
+      const dx = t.clientX - swipeTouch.startX;
+      if (dx >= C.PANDA_SWIPE_THRESHOLD_PX && game.status === 'playing' && game.species === 'panda') {
+        bunny.kick();
+        swipeTouch = null; // consume so we don't fire again on the same gesture
+      }
+      break;
+    }
+  }, { passive: true });
 
   document.addEventListener('touchend', e => {
     if (e.target === bunnyNameInput) return;
@@ -127,12 +152,23 @@ export function bindInput(canvas: HTMLCanvasElement): void {
       return;
     }
     e.preventDefault();
+    // Clear swipe tracking if this touch is the one we were watching.
+    if (swipeTouch) {
+      for (const t of Array.from(e.changedTouches)) {
+        if (t.identifier === swipeTouch.id) { swipeTouch = null; break; }
+      }
+    }
     if (releaseDuckIfMatched(e.changedTouches)) return;
     handleRelease();
   }, { passive: false });
 
   document.addEventListener('touchcancel', e => {
     if (e.target === bunnyNameInput) return;
+    if (swipeTouch) {
+      for (const t of Array.from(e.changedTouches)) {
+        if (t.identifier === swipeTouch.id) { swipeTouch = null; break; }
+      }
+    }
     if (releaseDuckIfMatched(e.changedTouches)) return;
     handleRelease();
   }, { passive: false });

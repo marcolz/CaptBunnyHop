@@ -15,12 +15,19 @@ export const C = {
   OBS_MAX_GAP: 1500,
   GLIDE_GRAVITY_MULT: 0.14,
   GLIDE_MAX_VY: 1.4,
+  PANDA_KICK_DURATION_FRAMES: 14,
+  PANDA_KICK_COOLDOWN_FRAMES: 60,
+  PANDA_KICK_LUNGE_DX: 35,
+  PANDA_KICK_REACH: 40,
+  PANDA_SWIPE_THRESHOLD_PX: 30,
+  PANDA_RECENTER_RATE: 0.04,
 } as const;
 
 export const SPECIES_PHYSICS = {
   bunny: { jumpVel: -11.5, maxJumps: 2, jumpCutoffVel: -4.5 },
   kitten: { jumpVel: -13.8, maxJumps: 1, jumpCutoffVel: -5.5 },
   puppy: { jumpVel: -11.5, maxJumps: 1, jumpCutoffVel: -4.5 },
+  panda: { jumpVel: -11.5, maxJumps: 1, jumpCutoffVel: -4.5 },
 } as const;
 
 export const STARTUP_QUOTES = [

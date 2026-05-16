@@ -1,7 +1,7 @@
 import { STARTUP_QUOTES } from './config';
 import { game, getCurrentName, setSpecies, type Species } from './state';
 import { score, getHistory } from './score';
-import { startJingle, stopJingle, playGameOverJingle, playMeow, playWoof, initAudio } from './audio';
+import { startJingle, stopJingle, playGameOverJingle, playMeow, playWoof, playPandaSelect, initAudio } from './audio';
 import { drawIdlePreview } from './bunny';
 
 export type OverlayMode = 'splash' | 'character_select' | 'waiting' | 'game_over';
@@ -18,9 +18,11 @@ const bunnyNameLabel = document.getElementById('bunny-name-label') as HTMLLabelE
 const charBtnBunny = document.getElementById('char-btn-bunny') as HTMLButtonElement;
 const charBtnKitten = document.getElementById('char-btn-kitten') as HTMLButtonElement;
 const charBtnPuppy = document.getElementById('char-btn-puppy') as HTMLButtonElement;
+const charBtnPanda = document.getElementById('char-btn-panda') as HTMLButtonElement;
 const charPreviewBunny = document.getElementById('char-preview-bunny') as HTMLCanvasElement;
 const charPreviewKitten = document.getElementById('char-preview-kitten') as HTMLCanvasElement;
 const charPreviewPuppy = document.getElementById('char-preview-puppy') as HTMLCanvasElement;
+const charPreviewPanda = document.getElementById('char-preview-panda') as HTMLCanvasElement;
 export const bunnyNameInput = document.getElementById('bunny-name') as HTMLInputElement;
 
 let onCharacterChosen: ((s: Species) => void) | null = null;
@@ -29,15 +31,18 @@ function paintPreviews(): void {
   const cb = charPreviewBunny.getContext('2d');
   const ck = charPreviewKitten.getContext('2d');
   const cp = charPreviewPuppy.getContext('2d');
+  const cd = charPreviewPanda.getContext('2d');
   if (cb) drawIdlePreview(cb, 'bunny');
   if (ck) drawIdlePreview(ck, 'kitten');
   if (cp) drawIdlePreview(cp, 'puppy');
+  if (cd) drawIdlePreview(cd, 'panda');
 }
 
 function updateSelectedHighlight(): void {
   charBtnBunny.classList.toggle('selected', game.species === 'bunny');
   charBtnKitten.classList.toggle('selected', game.species === 'kitten');
   charBtnPuppy.classList.toggle('selected', game.species === 'puppy');
+  charBtnPanda.classList.toggle('selected', game.species === 'panda');
 }
 
 charBtnBunny.addEventListener('click', () => {
@@ -59,6 +64,13 @@ charBtnPuppy.addEventListener('click', () => {
   playWoof();
   if (onCharacterChosen) onCharacterChosen('puppy');
 });
+charBtnPanda.addEventListener('click', () => {
+  setSpecies('panda');
+  updateSelectedHighlight();
+  initAudio();
+  playPandaSelect();
+  if (onCharacterChosen) onCharacterChosen('panda');
+});
 
 export function setOnCharacterChosen(fn: (s: Species) => void): void {
   onCharacterChosen = fn;
@@ -73,7 +85,7 @@ function escapeHtml(s: string): string {
 }
 
 function speciesIcon(s?: Species): string {
-  return s === 'kitten' ? '🐱' : s === 'puppy' ? '🐶' : s === 'bunny' ? '🐰' : '';
+  return s === 'kitten' ? '🐱' : s === 'puppy' ? '🐶' : s === 'panda' ? '🐼' : s === 'bunny' ? '🐰' : '';
 }
 
 export function showOverlay(mode: OverlayMode): void {
@@ -109,6 +121,7 @@ export function showOverlay(mode: OverlayMode): void {
     bunnyNameLabel.textContent =
       game.species === 'kitten' ? 'Name your kitten:' :
       game.species === 'puppy' ? 'Name your puppy:' :
+      game.species === 'panda' ? 'Name your panda:' :
       'Name your bunny:';
     bunnyNameInput.value = getCurrentName();
     overlayScores.textContent = (score.high > 0 ? `Best: ${score.high} • ` : '') + 'Press Space or Tap to Start';
@@ -123,6 +136,7 @@ export function showOverlay(mode: OverlayMode): void {
     const noun =
       game.species === 'kitten' ? 'kitten' :
       game.species === 'puppy' ? 'puppy' :
+      game.species === 'panda' ? 'panda' :
       'bunny';
     overlaySub.textContent = name
       ? `${name} scored ${score.current}!`
