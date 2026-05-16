@@ -579,8 +579,6 @@ export const obstacles = {
       const o = this.list[i];
       // Snacks are platforms — pass-through, no kill collision.
       if (o.type === 'snack') continue;
-      // Floating puffs aren't collectible until they've dropped.
-      if (o.type === 'puff' && o.isFloating) continue;
       let ob = o.getBounds();
       // Squat-under-archway exemption only applies when ungrown; a grown
       // bunny is too tall to fit under the lintel even when squatting.
