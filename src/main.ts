@@ -2,6 +2,7 @@ import { C } from './config';
 import { bindInput } from './input';
 import { startLoop } from './loop';
 import { showOverlay } from './overlay';
+import { initAnalytics } from './analytics';
 
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d');
@@ -12,6 +13,7 @@ canvas.width = C.W * dpr;
 canvas.height = C.H * dpr;
 ctx.scale(dpr, dpr);
 
+initAnalytics();
 bindInput(canvas);
 showOverlay('splash');
 startLoop(ctx);
