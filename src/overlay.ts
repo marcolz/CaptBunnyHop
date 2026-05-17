@@ -3,6 +3,7 @@ import { game, getCurrentName, setSpecies, type Species } from './state';
 import { score, getHistory } from './score';
 import { startJingle, stopJingle, playGameOverJingle, playMeow, playWoof, playPandaSelect, initAudio } from './audio';
 import { drawIdlePreview } from './bunny';
+import { trackEvent } from './analytics';
 
 export type OverlayMode = 'splash' | 'character_select' | 'waiting' | 'game_over';
 
@@ -48,6 +49,7 @@ function updateSelectedHighlight(): void {
 charBtnBunny.addEventListener('click', () => {
   setSpecies('bunny');
   updateSelectedHighlight();
+  trackEvent('character-bunny', 'Selected bunny');
   if (onCharacterChosen) onCharacterChosen('bunny');
 });
 charBtnKitten.addEventListener('click', () => {
@@ -55,6 +57,7 @@ charBtnKitten.addEventListener('click', () => {
   updateSelectedHighlight();
   initAudio();
   playMeow();
+  trackEvent('character-kitten', 'Selected kitten');
   if (onCharacterChosen) onCharacterChosen('kitten');
 });
 charBtnPuppy.addEventListener('click', () => {
@@ -62,6 +65,7 @@ charBtnPuppy.addEventListener('click', () => {
   updateSelectedHighlight();
   initAudio();
   playWoof();
+  trackEvent('character-puppy', 'Selected puppy');
   if (onCharacterChosen) onCharacterChosen('puppy');
 });
 charBtnPanda.addEventListener('click', () => {
@@ -69,6 +73,7 @@ charBtnPanda.addEventListener('click', () => {
   updateSelectedHighlight();
   initAudio();
   playPandaSelect();
+  trackEvent('character-panda', 'Selected panda');
   if (onCharacterChosen) onCharacterChosen('panda');
 });
 
