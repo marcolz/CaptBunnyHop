@@ -46,6 +46,7 @@ export function startLoop(ctx: CanvasRenderingContext2D): void {
     obstacles.drawEffects(ctx);
     score.draw(ctx);
     bunny.drawActionFlash(ctx);
+    bunny.drawKickCounter(ctx);
   }
 
   requestAnimationFrame(loop);

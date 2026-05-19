@@ -1,5 +1,6 @@
 import { C } from './config';
 import { Bunny, Bounds } from './bunny';
+import { game } from './state';
 import brickUrl from './assets/brick.webp';
 import powerupBrickUrl from './assets/powerup-brick.webp';
 import puffUrl from './assets/puff.webp';
@@ -592,6 +593,7 @@ export const obstacles = {
       if (o.type === 'puff') {
         // Power-up: grow the bunny and consume the puff.
         bunny.grow();
+        if (game.species === 'panda') bunny.refillKickCharge();
         this.list.splice(i, 1);
         continue;
       }

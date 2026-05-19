@@ -42,6 +42,7 @@ export class Bunny {
   kickCooldownTimer = 0;
   kickUsedThisJump = false;
   kickStartX = 0;
+  kickCharges: number = C.PANDA_MAX_KICK_CHARGES;
   // Generic action-flash slot: one signature-move callout drawn in the HUD per
   // species. Kind drives which drawer renders the flash, timer/duration drive
   // the pop-in / settle / fade-out animation. Puppy holds at "settle" for the
@@ -80,6 +81,7 @@ export class Bunny {
     this.kickCooldownTimer = 0;
     this.kickUsedThisJump = false;
     this.kickStartX = 0;
+    this.kickCharges = C.PANDA_MAX_KICK_CHARGES;
     this.actionFlashTimer = 0;
     this.actionFlashDuration = 0;
     this.actionFlashKind = null;
@@ -95,6 +97,7 @@ export class Bunny {
     if (this.isKicking) return;
     if (this.kickCooldownTimer > 0) return;
     if (this.kickUsedThisJump) return;
+    if (this.kickCharges <= 0) return;
     this.isKicking = true;
     this.kickTimer = C.PANDA_KICK_DURATION_FRAMES;
     this.kickUsedThisJump = true;
@@ -111,7 +114,12 @@ export class Bunny {
     this.actionFlashKind = 'panda';
     this.actionFlashDuration = C.PANDA_KICK_DURATION_FRAMES + C.PANDA_KICK_COOLDOWN_FRAMES;
     this.actionFlashTimer = this.actionFlashDuration;
+    this.kickCharges--;
     playPandaKick();
+  }
+
+  refillKickCharge(): void {
+    if (this.kickCharges < C.PANDA_MAX_KICK_CHARGES) this.kickCharges++;
   }
 
   grow(): void {
@@ -467,6 +475,59 @@ export class Bunny {
     }
     c.restore();
   }
+
+  // Persistent panda kick-charge indicator: three mini 功 tablets in the
+  // top-right corner. Filled tablets are remaining charges; spent ones grey
+  // out. Self-gates on species so the loop can call unconditionally.
+  drawKickCounter(c: CanvasRenderingContext2D): void {
+    if (game.species !== 'panda') return;
+    const tabW = 22;
+    const tabH = 30;
+    const gap = 6;
+    const totalW = tabW * C.PANDA_MAX_KICK_CHARGES + gap * (C.PANDA_MAX_KICK_CHARGES - 1);
+    const rightEdge = C.W - 10;
+    const top = 38;
+    for (let i = 0; i < C.PANDA_MAX_KICK_CHARGES; i++) {
+      const cx = rightEdge - totalW + tabW / 2 + i * (tabW + gap);
+      const cy = top + tabH / 2;
+      const active = i < this.kickCharges;
+      drawMiniKickTablet(c, cx, cy, tabW, tabH, active);
+    }
+  }
+}
+
+function drawMiniKickTablet(
+  c: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  w: number,
+  h: number,
+  active: boolean,
+): void {
+  const ROT = (17 * Math.PI) / 180;
+  c.save();
+  c.translate(cx, cy);
+  c.rotate(ROT);
+  if (active) {
+    c.fillStyle = 'rgba(192,40,42,0.92)';
+    c.fillRect(-w / 2, -h / 2, w, h);
+    c.strokeStyle = 'rgba(120,20,20,0.95)';
+    c.lineWidth = 1.5;
+    c.strokeRect(-w / 2, -h / 2, w, h);
+    c.fillStyle = '#0a0a0a';
+  } else {
+    c.fillStyle = 'rgba(120,120,120,0.28)';
+    c.fillRect(-w / 2, -h / 2, w, h);
+    c.strokeStyle = 'rgba(90,90,90,0.45)';
+    c.lineWidth = 1;
+    c.strokeRect(-w / 2, -h / 2, w, h);
+    c.fillStyle = 'rgba(70,70,70,0.55)';
+  }
+  c.font = 'bold 18px "STSong", "Songti SC", "SimSun", "Noto Serif CJK SC", serif';
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.fillText('功', 0, 1);
+  c.restore();
 }
 
 // Three-phase pop-in / settle / fade-out shared by all four character flashes.

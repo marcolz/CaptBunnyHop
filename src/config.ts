@@ -21,6 +21,7 @@ export const C = {
   PANDA_KICK_REACH: 40,
   PANDA_SWIPE_THRESHOLD_PX: 30,
   PANDA_RECENTER_RATE: 0.04,
+  PANDA_MAX_KICK_CHARGES: 3,
   // Kitten ALLEZ HOP! fires after the button has been held long enough that the
   // kitten has committed past its jump cutoff velocity and is going for a tall
   // jump (kitten vy reaches cutoff ≈ -5.5 from -13.8 in ~15 frames @ G=0.55).
