@@ -6,7 +6,7 @@ import { bg } from './background';
 import { obstacles } from './obstacle';
 import { showOverlay, hideOverlay, bunnyNameInput } from './overlay';
 import { initAudio, stopJingle, stopGameOverJingle, playHitSound } from './audio';
-import { trackEvent, scoreBucket } from './analytics';
+import { trackEvent } from './analytics';
 
 export function startGame(): boolean {
   const enteredName = (bunnyNameInput.value || '').trim().slice(0, 16);
@@ -44,8 +44,7 @@ export function gameOver(): void {
   score.checkHigh();
   saveToHistory(getCurrentName(), score.current, game.species);
   playHitSound();
-  const bucket = scoreBucket(score.current);
-  trackEvent(`game-over-${game.species}-${bucket}`, `Game over (${game.species}, ${bucket})`);
+  trackEvent(`game-over-${game.species}`, `Game over (${game.species})`);
   showOverlay('game_over');
 }
 
